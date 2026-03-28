@@ -1,3 +1,4 @@
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.TerrainFeatures;
 using System.Collections.Generic;
@@ -6,6 +7,11 @@ namespace LaCompta.Services
 {
     public static class ProfitabilityCalculator
     {
+        // Cache fertilizer cost per game day to avoid re-scanning farm tiles for every item
+        private static int _cachedFertilizerCost;
+        private static int _cachedFertilizerDay = -1;
+        private static int _cachedFertilizerYear = -1;
+
         // Fertilizer shop prices (what the player actually pays)
         private static readonly Dictionary<string, int> FertilizerPrices = new()
         {
@@ -20,11 +26,6 @@ namespace LaCompta.Services
             { "920", 30 },   // Deluxe Retaining Soil
         };
 
-        /// <summary>
-        /// Calculate the cost basis for a harvested crop item.
-        /// Includes seed cost + estimated fertilizer cost.
-        /// For non-crop items, returns 0.
-        /// </summary>
         public static int GetCostBasis(Item item)
         {
             if (item is not StardewValley.Object obj)
@@ -42,9 +43,6 @@ namespace LaCompta.Services
             return seedCost + fertilizerCost;
         }
 
-        /// <summary>
-        /// Calculate profit for an item: sell price - cost basis.
-        /// </summary>
         public static int CalculateProfit(Item item, int quantity = 1)
         {
             var sellPrice = GetSellPrice(item) * quantity;
@@ -52,9 +50,6 @@ namespace LaCompta.Services
             return sellPrice - costBasis;
         }
 
-        /// <summary>
-        /// Get the sell price for an item.
-        /// </summary>
         public static int GetSellPrice(Item item)
         {
             if (item is StardewValley.Object obj)
@@ -63,13 +58,12 @@ namespace LaCompta.Services
             return item.salePrice() / 2;
         }
 
-        /// <summary>
-        /// Scan all HoeDirt tiles on the farm to estimate the average fertilizer
-        /// cost per crop tile. This gives a fair per-item fertilizer cost estimate
-        /// since we can't track which specific tile a shipped item came from.
-        /// </summary>
         public static int EstimateAverageFertilizerCost()
         {
+            // Return cached value if already computed this game day
+            if (Context.IsWorldReady && Game1.dayOfMonth == _cachedFertilizerDay && Game1.year == _cachedFertilizerYear)
+                return _cachedFertilizerCost;
+
             var farm = Game1.getFarm();
             if (farm == null)
                 return 0;
@@ -100,22 +94,21 @@ namespace LaCompta.Services
             if (totalCropTiles == 0)
                 return 0;
 
-            // Average fertilizer cost per crop tile
-            return totalFertilizerCost / totalCropTiles;
+            // Average fertilizer cost per crop tile — cache for this game day
+            _cachedFertilizerCost = totalFertilizerCost / totalCropTiles;
+            if (Context.IsWorldReady)
+            {
+                _cachedFertilizerDay = Game1.dayOfMonth;
+                _cachedFertilizerYear = Game1.year;
+            }
+            return _cachedFertilizerCost;
         }
 
-        /// <summary>
-        /// Get fertilizer price by item ID.
-        /// </summary>
         public static int GetFertilizerPrice(string fertilizerId)
         {
             return FertilizerPrices.GetValueOrDefault(fertilizerId, 0);
         }
 
-        /// <summary>
-        /// Look up the seed cost for a crop by searching crop data.
-        /// Returns 0 if seed not found.
-        /// </summary>
         private static int FindSeedCostForCrop(string cropItemId)
         {
             if (Game1.cropData == null)

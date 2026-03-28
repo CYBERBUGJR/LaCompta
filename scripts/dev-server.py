@@ -186,8 +186,13 @@ def seed_database(db_path):
 
 # ─── API handlers ───
 
+_db_conn = None
+
 def get_db():
-    return sqlite3.connect(str(DEV_DB_PATH))
+    global _db_conn
+    if _db_conn is None:
+        _db_conn = sqlite3.connect(str(DEV_DB_PATH))
+    return _db_conn
 
 def rows_to_dicts(cursor, rows):
     cols = [d[0] for d in cursor.description]
@@ -317,9 +322,6 @@ class DevHandler(http.server.BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         params = parse_qs(parsed.query)
-
-        # CORS
-        self.send_header_cors = True
 
         # API routes
         if path == "/api/farminfo":

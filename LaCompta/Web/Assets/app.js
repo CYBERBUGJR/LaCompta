@@ -32,8 +32,8 @@ let charts = {};
 let seasons = [];
 let summaryData = null;
 let sortState = { key: 'profit', desc: true };
-let currentOverviewSeason = null;
 let currentProfitSeason = null;
+let currentProfitYear = null;
 
 /* Helpers */
 function gold(n) { return n == null ? '...' : n.toLocaleString() + 'g'; }
@@ -49,6 +49,11 @@ function seasonIcon(s) {
 }
 
 function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+function getUniqueYears() {
+  var years = getUniqueYears();
+  return years;
+}
 
 function createEl(tag, attrs, children) {
   var el = document.createElement(tag);
@@ -189,13 +194,6 @@ function tooltipConfig() {
   return { backgroundColor: '#16213e', titleColor: '#e6d9a8', bodyColor: '#a89b6e', borderColor: '#8b7355', borderWidth: 1 };
 }
 
-function chartScaleColors() {
-  return {
-    ticks: { color: '#6b6245', font: { size: 9 } },
-    grid: { color: 'rgba(139,115,85,0.1)' }
-  };
-}
-
 function showEmpty(container, emoji, msg) {
   clearChildren(container);
   var empty = createEl('div', { className: 'empty-state' });
@@ -218,8 +216,7 @@ function buildSeasonTabs(container, activeSeason, activeYear, cb) {
   }
 
   // Get unique years
-  var years = [];
-  seasons.forEach(function(s) { if (years.indexOf(s.year) === -1) years.push(s.year); });
+  var years = getUniqueYears();
 
   // Wrapper row: year dropdown + season tabs
   var row = createEl('div', { className: 'season-selector-row' });
@@ -302,8 +299,6 @@ function navigate(hash) {
   });
   loadPageData(page);
 }
-
-var loadedPages = {};
 
 function loadPageData(page) {
   if (page === 'overview') loadOverviewPage();
@@ -440,16 +435,19 @@ async function loadAlltimeCharts() {
   // Area chart across all seasons
   var allDays = [];
   var allLabels = [];
-  for (var i = 0; i < seasons.length; i++) {
-    var s = seasons[i];
-    var data = await fetchJson('/api/daily?season=' + s.season + '&year=' + s.year);
-    if (data) {
-      data.forEach(function(d) {
+  var results = await Promise.all(seasons.map(function(s) {
+    return fetchJson('/api/daily?season=' + s.season + '&year=' + s.year).then(function(data) {
+      return { season: s, data: data };
+    });
+  }));
+  results.forEach(function(r) {
+    if (r.data) {
+      r.data.forEach(function(d) {
         allDays.push(d);
-        allLabels.push(s.season.charAt(0).toUpperCase() + s.season.slice(1) + ' Y' + s.year + ' D' + d.day);
+        allLabels.push(r.season.season.charAt(0).toUpperCase() + r.season.season.slice(1) + ' Y' + r.season.year + ' D' + d.day);
       });
     }
-  }
+  });
 
   if (allDays.length === 0) return;
 
@@ -631,9 +629,7 @@ function updateDoughnutForFilters() {
     ds.backgroundColor = CAT_COLORS.map(function(c, i) {
       return isCatVisible(i) ? c : c + '22';
     });
-    ds.borderColor = CAT_COLORS.map(function(c, i) {
-      return isCatVisible(i) ? '#1a1a2e' : '#1a1a2e';
-    });
+    ds.borderColor = '#1a1a2e';
     ds.borderWidth = CAT_COLORS.map(function(c, i) {
       return isCatVisible(i) ? 4 : 1;
     });
@@ -764,7 +760,6 @@ async function loadOverviewCharts(season, year) {
   }
 
   /* Doughnut — click to filter trend chart */
-  activeFilter = -1;
   destroyChart('overviewDoughnut');
   charts.overviewDoughnut = new Chart(document.getElementById('overview-doughnut'), {
     type: 'doughnut',
@@ -821,8 +816,7 @@ function rotateTags() {
 
 /* ========== COMPARISON ========== */
 function buildCompSelector(container, label, defaultYear, defaultSeason, onChange) {
-  var years = [];
-  seasons.forEach(function(s) { if (years.indexOf(s.year) === -1) years.push(s.year); });
+  var years = getUniqueYears();
 
   var wrap = createEl('div', { className: 'comp-selector-group' });
   wrap.appendChild(createEl('label', { textContent: label }));
@@ -987,17 +981,17 @@ function renderComparison(a, b) {
 /* ========== PROFITABILITY ========== */
 function loadProfitabilityPage() {
   var defSeason = currentProfitSeason || (seasons[0] && seasons[0].season);
-  var defYear = (currentProfitSeason && currentProfitSeason._year) || (seasons[0] && seasons[0].year);
+  var defYear = currentProfitYear || (seasons[0] && seasons[0].year);
   buildSeasonTabs(
     document.getElementById('profit-season-tabs'),
     defSeason, defYear,
     function(season, year) {
       currentProfitSeason = season;
-      currentProfitSeason._year = year;
+      currentProfitYear = year;
       loadProfitTable(season, year);
     }
   );
-  if (seasons.length > 0) loadProfitTable(seasons[0].season, seasons[0].year);
+  if (seasons.length > 0) loadProfitTable(defSeason, defYear);
 
   /* Sort handler */
   document.querySelectorAll('#profit-table thead th').forEach(function(th) {
@@ -1006,8 +1000,7 @@ function loadProfitabilityPage() {
       if (!key) return;
       if (sortState.key === key) sortState.desc = !sortState.desc;
       else { sortState.key = key; sortState.desc = true; }
-      var s0 = seasons[0];
-      if (s0) loadProfitTable(currentProfitSeason || s0.season, (currentProfitSeason && currentProfitSeason._year) || s0.year);
+      if (currentProfitSeason) loadProfitTable(currentProfitSeason, currentProfitYear);
     };
   });
 }
@@ -1100,11 +1093,14 @@ async function init() {
   buildNav();
   rotateTags();
 
-  summaryData = await fetchJson('/api/summary');
-  seasons = await fetchJson('/api/seasons') || [];
-
-  // Load farm name
-  var farmInfo = await fetchJson('/api/farminfo');
+  var initData = await Promise.all([
+    fetchJson('/api/summary'),
+    fetchJson('/api/seasons'),
+    fetchJson('/api/farminfo')
+  ]);
+  summaryData = initData[0];
+  seasons = initData[1] || [];
+  var farmInfo = initData[2];
   if (farmInfo && farmInfo.farmName) {
     document.getElementById('farm-name').textContent = farmInfo.farmName + ' Farm — ' + farmInfo.playerName;
   }
