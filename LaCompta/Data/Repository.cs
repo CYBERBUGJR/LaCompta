@@ -20,9 +20,16 @@ namespace LaCompta.Data
             using var conn = _db.GetConnection();
             var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                INSERT OR REPLACE INTO daily_records (season, year, day, farming_income, foraging_income, fishing_income, mining_income, other_income, total_expenses, player_id)
-                VALUES ($season, $year, $day, $farming, $foraging, $fishing, $mining, $other, $expenses, $playerId);
-                SELECT last_insert_rowid();";
+                INSERT INTO daily_records (season, year, day, farming_income, foraging_income, fishing_income, mining_income, other_income, total_expenses, player_id)
+                VALUES ($season, $year, $day, $farming, $foraging, $fishing, $mining, $other, $expenses, $playerId)
+                ON CONFLICT(season, year, day, player_id) DO UPDATE SET
+                    farming_income = $farming,
+                    foraging_income = $foraging,
+                    fishing_income = $fishing,
+                    mining_income = $mining,
+                    other_income = $other,
+                    total_expenses = $expenses;
+                SELECT id FROM daily_records WHERE season = $season AND year = $year AND day = $day AND player_id = $playerId;";
             cmd.Parameters.AddWithValue("$season", record.Season);
             cmd.Parameters.AddWithValue("$year", record.Year);
             cmd.Parameters.AddWithValue("$day", record.Day);

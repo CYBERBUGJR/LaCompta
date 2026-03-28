@@ -5,13 +5,16 @@ namespace LaCompta.Data
 {
     public class DatabaseContext
     {
+        private const long MaxDbSizeBytes = 2L * 1024 * 1024 * 1024; // 2 GiB
         private readonly string _connectionString;
+        private readonly string _dbPath;
 
         public DatabaseContext(string modDataPath)
         {
-            var dbPath = Path.Combine(modDataPath, "lacompta.db");
-            _connectionString = $"Data Source={dbPath}";
+            _dbPath = Path.Combine(modDataPath, "lacompta.db");
+            _connectionString = $"Data Source={_dbPath}";
             InitializeDatabase();
+            CheckAndVacuum();
         }
 
         public SqliteConnection GetConnection()
@@ -94,6 +97,43 @@ namespace LaCompta.Data
                 CREATE INDEX IF NOT EXISTS idx_fish_records_legendary ON fish_records(is_legendary);
             ";
             command.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// If the DB exceeds 2 GiB, prune old item_transactions (keeping daily_records
+        /// and season_summaries intact) then VACUUM to reclaim space.
+        /// </summary>
+        private void CheckAndVacuum()
+        {
+            if (!File.Exists(_dbPath))
+                return;
+
+            var fileSize = new FileInfo(_dbPath).Length;
+            if (fileSize < MaxDbSizeBytes)
+                return;
+
+            using var conn = GetConnection();
+
+            // Delete oldest item_transactions first (they're the bulk of data).
+            // Keep the most recent 4 in-game years (16 seasons * 28 days = 448 daily records per player).
+            // Delete transactions older than that.
+            var pruneCmd = conn.CreateCommand();
+            pruneCmd.CommandText = @"
+                DELETE FROM item_transactions
+                WHERE daily_record_id IN (
+                    SELECT dr.id FROM daily_records dr
+                    WHERE dr.year < (SELECT MAX(year) - 4 FROM daily_records)
+                );
+
+                DELETE FROM fish_records
+                WHERE year < (SELECT MAX(year) - 4 FROM fish_records);
+            ";
+            pruneCmd.ExecuteNonQuery();
+
+            // VACUUM to reclaim disk space
+            var vacuumCmd = conn.CreateCommand();
+            vacuumCmd.CommandText = "VACUUM;";
+            vacuumCmd.ExecuteNonQuery();
         }
     }
 }
