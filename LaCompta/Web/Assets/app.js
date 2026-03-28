@@ -51,7 +51,8 @@ function seasonIcon(s) {
 function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 
 function getUniqueYears() {
-  var years = getUniqueYears();
+  var years = [];
+  seasons.forEach(function(s) { if (years.indexOf(s.year) === -1) years.push(s.year); });
   return years;
 }
 
