@@ -1,0 +1,10 @@
+{
+    "Name": "LaCompta",
+    "Author": "bcalvet",
+    "Version": "0.1.0",
+    "Description": "Farm economics tracker — track income, expenses, and profitability across seasons. La Compta, because every gold coin counts!",
+    "UniqueID": "bcalvet.LaCompta",
+    "EntryDll": "LaCompta.dll",
+    "MinimumApiVersion": "4.0.0",
+    "UpdateKeys": []
+}

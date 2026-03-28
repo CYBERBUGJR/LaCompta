@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <EnableHarmony>true</EnableHarmony>
+    <RootNamespace>LaCompta</RootNamespace>
+    <BundleExtraAssemblies>ThirdParty, System</BundleExtraAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.*" />
+  </ItemGroup>
+
+  <!-- Copy native e_sqlite3 lib to both output AND mod deploy folder.
+       ModBuildConfig only copies .dll files, not .so/.dylib, so we handle it manually. -->
+  <Target Name="CopyNativeSqlite" AfterTargets="Build">
+    <PropertyGroup>
+      <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/linux-x64/native/libe_sqlite3.so</NativeSqliteSrc>
+      <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/osx-x64/native/libe_sqlite3.dylib</NativeSqliteSrc>
+      <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/win-x64/native/e_sqlite3.dll</NativeSqliteSrc>
+      <GameModsDir>$([System.IO.Path]::Combine($(HOME), '.steam', 'steam', 'steamapps', 'common', 'Stardew Valley', 'Mods', 'LaCompta'))</GameModsDir>
+    </PropertyGroup>
+    <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(TargetDir)" Condition="Exists('$(NativeSqliteSrc)')" />
+    <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(GameModsDir)" Condition="Exists('$(NativeSqliteSrc)') And Exists('$(GameModsDir)')" />
+  </Target>
+</Project>
