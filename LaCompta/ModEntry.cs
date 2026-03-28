@@ -42,6 +42,9 @@ namespace LaCompta
             _tracker = new TrackingService(_repo, this.Monitor);
             _seasonSummary = new SeasonSummaryService(_repo, this.Monitor);
 
+            // Stop existing web server if reloading a save without returning to title
+            _webServer?.Stop();
+
             // Start web server
             var api = new ApiController(_repo, this.Monitor, this.Helper.DirectoryPath);
             _webServer = new WebServer(api, this.Monitor);
