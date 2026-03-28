@@ -171,10 +171,17 @@ namespace LaCompta.Data
         }
 
         public List<FishRecord> GetLegendaryFish(string playerId = "")
+            => GetFishRecords(playerId, legendaryOnly: true);
+
+        public List<FishRecord> GetAllFish(string playerId = "")
+            => GetFishRecords(playerId, legendaryOnly: false);
+
+        private List<FishRecord> GetFishRecords(string playerId, bool legendaryOnly)
         {
             using var conn = _db.GetConnection();
             var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT * FROM fish_records WHERE is_legendary = 1 AND ($playerId = '' OR player_id = $playerId) ORDER BY year, day";
+            var where = legendaryOnly ? "is_legendary = 1 AND " : "";
+            cmd.CommandText = $"SELECT * FROM fish_records WHERE {where}($playerId = '' OR player_id = $playerId) ORDER BY year, day";
             cmd.Parameters.AddWithValue("$playerId", playerId);
 
             var fish = new List<FishRecord>();

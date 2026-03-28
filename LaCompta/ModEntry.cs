@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using LaCompta.Data;
 using LaCompta.Services;
+using LaCompta.Web;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -13,6 +16,7 @@ namespace LaCompta
         private Repository _repo = null!;
         private TrackingService _tracker = null!;
         private SeasonSummaryService _seasonSummary = null!;
+        private WebServer _webServer = null!;
 
         public override void Entry(IModHelper helper)
         {
@@ -21,10 +25,12 @@ namespace LaCompta
             helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += this.OnDayStarted;
             helper.Events.GameLoop.DayEnding += this.OnDayEnding;
+            helper.Events.GameLoop.ReturnedToTitle += this.OnReturnedToTitle;
 
-            // Test commands — type these in the SMAPI console
+            // Console commands
             helper.ConsoleCommands.Add("lacompta_test", "Run LaCompta integration tests", this.RunTests);
             helper.ConsoleCommands.Add("lacompta_status", "Show current DB stats", this.ShowStatus);
+            helper.ConsoleCommands.Add("lacompta_open", "Open LaCompta dashboard in browser", this.OpenDashboard);
         }
 
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
@@ -36,7 +42,40 @@ namespace LaCompta
             _tracker = new TrackingService(_repo, this.Monitor);
             _seasonSummary = new SeasonSummaryService(_repo, this.Monitor);
 
+            // Stop existing web server if reloading a save without returning to title
+            _webServer?.Stop();
+
+            // Start web server
+            var api = new ApiController(_repo, this.Monitor, this.Helper.DirectoryPath);
+            _webServer = new WebServer(api, this.Monitor);
+            _webServer.Start();
+
             this.Monitor.Log($"LaCompta initialized for {Game1.player.Name}'s farm. Let the accounting begin!", LogLevel.Info);
+        }
+
+        private void OnReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
+        {
+            _webServer?.Stop();
+        }
+
+        private void OpenDashboard(string command, string[] args)
+        {
+            var url = "http://localhost:5555";
+            try
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    Process.Start(new ProcessStartInfo("xdg-open", url) { UseShellExecute = false });
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    Process.Start(new ProcessStartInfo("open", url) { UseShellExecute = false });
+                else
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+
+                this.Monitor.Log($"Opening dashboard at {url}", LogLevel.Info);
+            }
+            catch (System.Exception ex)
+            {
+                this.Monitor.Log($"Failed to open browser: {ex.Message}. Open {url} manually.", LogLevel.Warn);
+            }
         }
 
         private void OnDayStarted(object sender, DayStartedEventArgs e)

@@ -12,8 +12,8 @@ Stardew Valley players can track, visualize, and share their farm's financial pe
 
 | Attribute | Value |
 |-----------|-------|
-| Version | 0.0.0 |
-| Status | Prototype |
+| Version | 0.2.0 |
+| Status | Dashboard Complete |
 | Last Updated | 2026-03-28 |
 
 ## Requirements
@@ -91,6 +91,10 @@ Stardew Valley players can track, visualize, and share their farm's financial pe
 | SQLite for time-series storage | Lightweight, no external deps, embedded in mod | 2026-03-28 | Active |
 | Dual mode (Google Sheets / Local) | User choice: cloud convenience or privacy | 2026-03-28 | Active |
 | SMAPI C# mod (not Content Patcher) | Need runtime logic, event handling, web server | 2026-03-28 | Active |
+| Single-file SPA dashboard | No build step, inline CSS/JS, hash routing | 2026-03-28 | Active |
+| Chart.js via CDN | Lightweight, no npm, works in single HTML file | 2026-03-28 | Active |
+| Custom dropdown components | Native `<select>` unstyable for pixel art theme | 2026-03-28 | Active |
+| Standalone Python dev server | Frontend dev without game, separate dev DB | 2026-03-28 | Active |
 
 ## Tech Stack
 

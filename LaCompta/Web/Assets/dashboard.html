@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LaCompta — Farm Economics Dashboard</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <button class="burger-btn" id="burger-btn">&#9776;</button>
+    <span class="sidebar-title">LaCompta</span>
+  </div>
+  <div class="sidebar-logo">
+    <img src="/urssaf-logo.svg" alt="URSSAF" class="urssaf-logo">
+    <span class="urssaf-text">Partenaire officiel</span>
+  </div>
+  <ul class="nav-list" id="nav-list"></ul>
+</nav>
+
+<!-- Main content -->
+<div class="main-content" id="main-content">
+  <div class="container">
+
+    <!-- Overview page -->
+    <div class="page" id="page-overview">
+      <div class="header">
+        <h1><img src="/favicon.png" alt="" class="title-logo"> La Compta</h1>
+        <div class="farm-name" id="farm-name"></div>
+        <div class="tagline" id="tagline"></div>
+      </div>
+      <div class="summary-row" id="summary-cards"></div>
+      <div class="overview-layout">
+        <div class="overview-controls">
+          <div class="panel">
+            <div class="panel-title">View</div>
+            <div class="panel-body">
+              <div class="time-range-selector" id="time-range-selector">
+                <button class="range-btn active" data-range="season">Per Season</button>
+                <button class="range-btn" data-range="year">Per Year</button>
+                <button class="range-btn" data-range="alltime">All Time</button>
+              </div>
+              <div class="season-tabs" id="overview-season-tabs"></div>
+              <div class="filter-chips" id="filter-chips"></div>
+            </div>
+          </div>
+        </div>
+        <div class="overview-charts-area">
+      <div class="overview-main-row">
+        <div class="panel overview-trend-col">
+          <div class="panel-title">Daily Income Trends</div>
+          <div class="panel-body">
+            <div class="chart-container-large"><canvas id="overview-trend-line"></canvas></div>
+            <button class="reset-zoom-btn" id="overview-trend-reset-zoom">Reset Zoom</button>
+          </div>
+        </div>
+        <div class="overview-side-col">
+          <div class="panel">
+            <div class="panel-title">Income Distribution</div>
+            <div class="panel-body"><div class="chart-container"><canvas id="overview-doughnut"></canvas></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Category Showdown</div>
+            <div class="panel-body"><div class="chart-container"><canvas id="overview-bar"></canvas></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="overview-alltime-panel" style="display:none;">
+        <div class="panel-title">Income Over All Seasons</div>
+        <div class="panel-body">
+          <div class="chart-container-large"><canvas id="overview-alltime-area"></canvas></div>
+          <button class="reset-zoom-btn" id="overview-reset-zoom">Reset Zoom</button>
+        </div>
+      </div>
+      <div class="panel" id="overview-season-table-panel" style="display:none;">
+        <div class="panel-title">Season Performance</div>
+        <div class="panel-body">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Season</th><th>Income</th><th>Expenses</th><th>Net</th><th>Best Day</th></tr></thead>
+              <tbody id="overview-alltime-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison page -->
+    <div class="page" id="page-comparison">
+      <div class="page-title">Season Comparison</div>
+      <div class="comparison-selectors" id="comparison-selectors"></div>
+      <div class="summary-row" id="comparison-stats"></div>
+      <div class="comparison-charts">
+        <div class="panel">
+          <div class="panel-title" id="comp-title-a">Side by Side</div>
+          <div class="panel-body"><div class="chart-container"><canvas id="comp-chart-a"></canvas></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" id="comp-title-b">Difference (B - A)</div>
+          <div class="panel-body"><div class="chart-container"><canvas id="comp-chart-b"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profitability page -->
+    <div class="page" id="page-profitability">
+      <div class="page-title">Show Me The Money &#x1F4B0;</div>
+      <div class="season-tabs" id="profit-season-tabs"></div>
+      <div class="panel">
+        <div class="panel-title">Item Profitability</div>
+        <div class="panel-body">
+          <div class="table-wrapper">
+            <table id="profit-table">
+              <thead><tr>
+                <th data-sort="itemName">Item <span class="sort-arrow"></span></th>
+                <th data-sort="category">Category <span class="sort-arrow"></span></th>
+                <th data-sort="quantity">Qty <span class="sort-arrow"></span></th>
+                <th data-sort="totalPrice">Revenue <span class="sort-arrow"></span></th>
+                <th data-sort="costBasis">Cost <span class="sort-arrow"></span></th>
+                <th data-sort="profit">Profit <span class="sort-arrow"></span></th>
+              </tr></thead>
+              <tbody id="profit-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legendary page -->
+    <div class="page" id="page-legendary">
+      <div class="page-title">Hall of Legendary Catches</div>
+      <div class="fish-grid" id="fish-grid"></div>
+      <div class="footer" id="legendary-footer">
+        <img src="/urssaf-logo.svg" alt="URSSAF"><br>
+        <em>"Even fish must pay taxes"</em>
+      </div>
+    </div>
+
+    <div class="footer">
+      LaCompta v0.1.0 &mdash; <a href="https://github.com/CYBERBUGJR/LaCompta" target="_blank">GitHub</a>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
