@@ -1,0 +1,2184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LaCompta — Farm Economics Dashboard</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+:root {
+  --bg-deep: #0f0e1a;
+  --bg-main: #1a1a2e;
+  --bg-panel: #16213e;
+  --bg-panel-alt: #1c2a4a;
+  --bg-hover: #243356;
+  --text-primary: #e6d9a8;
+  --text-secondary: #a89b6e;
+  --text-muted: #6b6245;
+  --border-outer: #8b7355;
+  --border-inner: #c4a86b;
+  --border-glow: rgba(196, 168, 107, 0.15);
+  --farming: #4CAF50;
+  --foraging: #8BC34A;
+  --fishing: #2196F3;
+  --mining: #FF9800;
+  --other: #9E9E9E;
+  --gold: #ffd700;
+  --red: #e74c3c;
+  --green: #2ecc71;
+  --pixel: "Press Start 2P", monospace;
+  --mono: "Courier New", Courier, monospace;
+  --sidebar-width: 220px;
+  --sidebar-collapsed: 52px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--bg-panel);
+  border-right: 3px solid var(--border-outer);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease;
+  overflow: hidden;
+}
+
+.sidebar.collapsed { width: var(--sidebar-collapsed); }
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 2px solid var(--border-outer);
+  min-height: 48px;
+}
+
+.burger-btn {
+  background: none;
+  border: 2px solid var(--border-outer);
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.burger-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+.sidebar-title {
+  font-family: var(--pixel);
+  font-size: 0.55rem;
+  color: var(--gold);
+  margin-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar.collapsed .sidebar-title { display: none; }
+
+.nav-list { list-style: none; padding: 8px 0; flex: 1; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s, border-left-color 0.15s;
+  border-left: 3px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.nav-item.active {
+  border-left-color: var(--gold);
+  color: var(--gold);
+  background: rgba(196, 168, 107, 0.08);
+}
+
+.nav-icon { font-size: 1.1rem; min-width: 28px; text-align: center; flex-shrink: 0; }
+
+.nav-label {
+  font-family: var(--pixel);
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  margin-left: 8px;
+}
+
+.sidebar.collapsed .nav-label { display: none; }
+
+/* URSSAF logo in sidebar */
+.sidebar-logo {
+  padding: 12px;
+  border-bottom: 2px solid var(--border-outer);
+  text-align: center;
+  background: rgba(0,0,0,0.15);
+}
+
+.urssaf-logo {
+  width: 80%;
+  max-width: 160px;
+  height: auto;
+  filter: brightness(0.9);
+  transition: filter 0.2s;
+}
+
+.urssaf-logo:hover { filter: brightness(1.1); }
+
+.urssaf-text {
+  display: block;
+  font-family: var(--pixel);
+  font-size: 0.35rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.sidebar.collapsed .sidebar-logo { padding: 6px; }
+.sidebar.collapsed .urssaf-logo { max-width: 32px; }
+.sidebar.collapsed .urssaf-text { display: none; }
+
+/* Main content */
+.main-content {
+  margin-left: var(--sidebar-width);
+  transition: margin-left 0.25s ease;
+  min-height: 100vh;
+}
+
+.sidebar.collapsed ~ .main-content { margin-left: var(--sidebar-collapsed); }
+
+.container { max-width: 100%; margin: 0 auto; padding: 16px 24px; }
+
+/* Pages */
+.page { display: none; }
+.page.active { display: block; }
+
+/* Panels */
+.panel {
+  background: var(--bg-panel);
+  border: 3px solid var(--border-outer);
+  outline: 2px solid var(--border-inner);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--bg-deep), 0 0 20px var(--border-glow), inset 0 1px 0 rgba(255,255,255,0.03);
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: -1px; right: -1px; bottom: -1px;
+  border: 1px solid rgba(196, 168, 107, 0.1);
+  pointer-events: none;
+}
+
+.panel-title {
+  font-family: var(--pixel);
+  font-size: 0.65rem;
+  color: var(--border-inner);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 10px 16px;
+  border-bottom: 2px solid var(--border-outer);
+  background: rgba(0,0,0,0.2);
+}
+
+.panel-body { padding: 16px; }
+
+/* Header */
+.header {
+  text-align: center;
+  padding: 20px 12px 12px;
+}
+
+.header h1 {
+  font-family: var(--pixel);
+  font-size: 1.8rem;
+  color: var(--gold);
+  text-shadow: 2px 2px 0 #8b6914, 4px 4px 0 rgba(0,0,0,0.5);
+  margin-bottom: 12px;
+  letter-spacing: 3px;
+}
+
+.title-logo {
+  height: 1.4em;
+  vertical-align: middle;
+  margin-right: 8px;
+  filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));
+}
+
+.header .farm-name {
+  font-family: var(--pixel);
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.header .tagline {
+  font-style: italic;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  min-height: 1.2em;
+  transition: opacity 0.4s;
+}
+
+.header .sub {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+@keyframes coinSpin { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.1); } }
+.coin { display: inline-block; animation: coinSpin 2s ease-in-out infinite; color: var(--gold); }
+
+/* Page title */
+.page-title {
+  font-family: var(--pixel);
+  font-size: 1rem;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  margin-bottom: 20px;
+  letter-spacing: 2px;
+}
+
+/* Summary cards */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.stat-card {
+  background: var(--bg-panel);
+  border: 3px solid var(--border-outer);
+  outline: 2px solid var(--border-inner);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--bg-deep), 0 0 15px var(--border-glow);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 6px var(--bg-deep), 0 0 25px var(--border-glow);
+}
+
+.stat-card .label {
+  font-family: var(--pixel);
+  font-size: 0.45rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.stat-card .value {
+  font-family: var(--pixel);
+  font-size: 1.1rem;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+}
+
+.stat-card .value.positive { color: var(--green); }
+.stat-card .value.negative { color: var(--red); }
+.stat-card .tooltip-text { font-size: 0.65rem; color: var(--text-muted); margin-top: 4px; font-style: italic; }
+
+/* Stock-ticker style cards */
+.stock-card { padding: 32px 24px; }
+.stock-card .label { font-size: 0.6rem; margin-bottom: 12px; }
+
+.stock-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stock-arrow {
+  font-size: 2.4rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.stock-value {
+  font-family: var(--pixel);
+  font-size: 1.2rem;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+}
+
+.stock-pct {
+  font-family: var(--pixel);
+  font-size: 0.75rem;
+  opacity: 0.85;
+  margin-left: auto;
+}
+
+.stock-up { color: var(--green); }
+.stock-down { color: var(--red); }
+
+.stock-arrow.stock-up { animation: arrowBounceUp 0.6s ease-out; }
+.stock-arrow.stock-down { animation: arrowBounceDown 0.6s ease-out; }
+
+@keyframes arrowBounceUp {
+  0% { transform: translateY(5px); opacity: 0; }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes arrowBounceDown {
+  0% { transform: translateY(-5px); opacity: 0; }
+  50% { transform: translateY(3px); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* Money falling effect on stat card hover */
+@keyframes moneyFall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(120px) rotate(360deg); opacity: 0; }
+}
+
+.money-particle {
+  position: absolute;
+  font-size: 1rem;
+  pointer-events: none;
+  animation: moneyFall 1.2s ease-in forwards;
+  z-index: 10;
+}
+
+/* Season selector: year dropdown + season tabs */
+.season-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Custom dropdown (replaces native select) */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+
+.custom-dropdown-btn {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  padding: 10px 36px 10px 16px;
+  background: var(--bg-panel);
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  position: relative;
+  white-space: nowrap;
+  letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-dropdown-arrow {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--gold);
+  pointer-events: none;
+  font-size: 0.5rem;
+  color: var(--gold);
+  transition: transform 0.2s;
+}
+
+.custom-dropdown.open .custom-dropdown-arrow { transform: rotate(180deg); }
+
+.custom-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: -2px;
+  right: -2px;
+  z-index: 100;
+  background: var(--bg-panel);
+  border: 2px solid var(--gold);
+  border-top: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.custom-dropdown.open .custom-dropdown-menu { display: block; }
+
+.custom-dropdown-item {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.custom-dropdown-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.custom-dropdown-item.selected {
+  color: var(--gold);
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.season-tabs-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Season tabs */
+.season-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 20px 0 16px; padding: 0 4px; }
+
+.season-tab {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  padding: 10px 16px;
+  border: 2px solid var(--border-outer);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.season-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+.season-tab.active { background: var(--border-outer); color: var(--bg-deep); border-color: var(--border-inner); box-shadow: 0 0 10px var(--border-glow); }
+.season-tab.spring.active { border-color: #4CAF50; background: #2d5a30; color: #a8e6a8; }
+.season-tab.summer.active { border-color: #FF9800; background: #5a3d00; color: #ffe0a0; }
+.season-tab.fall.active { border-color: #e74c3c; background: #5a1a14; color: #f0a8a0; }
+.season-tab.winter.active { border-color: #2196F3; background: #0d3a5a; color: #a0d4f0; }
+
+/* Charts */
+.charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin: 16px 0; }
+
+/* Overview layout: controls panel on left, charts on right */
+.overview-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  margin-top: 32px;
+  align-items: start;
+}
+
+.overview-controls {
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-controls > .panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.overview-controls .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overview-controls .time-range-selector {
+  flex-direction: column;
+  margin: 0;
+}
+
+.overview-controls .range-btn {
+  width: 100%;
+  text-align: center;
+}
+
+.overview-controls .season-tabs {
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.overview-controls .season-tab {
+  width: 100%;
+  text-align: center;
+}
+
+.overview-controls .season-selector-row {
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.overview-controls .season-tabs-inner {
+  flex-direction: column;
+  width: 100%;
+}
+
+.overview-controls .season-tabs-inner .season-tab {
+  width: 100%;
+  text-align: left;
+}
+
+.overview-controls .year-dropdown {
+  width: 100%;
+}
+
+.overview-controls .filter-chips {
+  flex-direction: column;
+  margin: 0;
+}
+
+.overview-charts-area {
+  min-width: 0;
+}
+
+/* Align charts with controls — remove all top margins from chart area children */
+.overview-charts-area > .overview-main-row {
+  margin-top: 0;
+}
+
+.overview-charts-area > .overview-main-row > .panel {
+  margin-bottom: 0;
+}
+
+.overview-charts-area > .panel {
+  margin-bottom: 0;
+}
+
+/* Overview main layout: trend 75% left, pie+bar stacked 25% right */
+.overview-main-row {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+  align-items: stretch;
+}
+
+.overview-trend-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-trend-col.panel {
+  margin-bottom: 0;
+}
+
+.overview-trend-col .panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-trend-col .chart-container-large {
+  flex: 1;
+  min-height: 0;
+}
+
+.overview-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overview-side-col .panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.overview-side-col .panel-body {
+  flex: 1;
+}
+
+.overview-side-col .chart-container { min-height: 200px; height: 100%; }
+.chart-container { position: relative; width: 100%; min-height: 280px; }
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+.chart-container-large { position: relative; width: 100%; min-height: 400px; }
+.chart-container-large canvas { width: 100% !important; height: 100% !important; }
+
+/* Reset zoom button */
+.reset-zoom-btn {
+  font-family: var(--pixel);
+  font-size: 0.4rem;
+  padding: 6px 12px;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-outer);
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.15s;
+}
+
+.reset-zoom-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* Time range selector */
+.time-range-selector {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 8px;
+  padding: 0 4px;
+}
+
+.range-btn {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  padding: 8px 16px;
+  border: 2px solid var(--border-outer);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 1px;
+}
+
+.range-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--gold); }
+.range-btn.active { background: var(--bg-panel); color: var(--gold); border-color: var(--gold); box-shadow: inset 0 0 8px rgba(255,215,0,0.15); }
+
+/* Filter chips */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  min-height: 0;
+  transition: min-height 0.2s;
+}
+
+.filter-chips:empty { display: none; }
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 2px;
+  font-family: var(--pixel);
+  font-size: 0.45rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: default;
+  border: 2px solid;
+  animation: chipIn 0.2s ease-out;
+}
+
+@keyframes chipIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.filter-chip .chip-x {
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-family: var(--mono);
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  line-height: 1;
+}
+
+.filter-chip .chip-x:hover { opacity: 1; }
+
+.filter-chip.Farming  { background: rgba(76,175,80,0.2);  color: var(--farming);  border-color: var(--farming); }
+.filter-chip.Foraging { background: rgba(139,195,74,0.2); color: var(--foraging); border-color: var(--foraging); }
+.filter-chip.Fishing  { background: rgba(33,150,243,0.2); color: var(--fishing);  border-color: var(--fishing); }
+.filter-chip.Mining   { background: rgba(255,152,0,0.2);  color: var(--mining);   border-color: var(--mining); }
+.filter-chip.Other    { background: rgba(158,158,158,0.2);color: var(--other);    border-color: var(--other); }
+
+.filter-clear-btn {
+  font-family: var(--pixel);
+  font-size: 0.4rem;
+  padding: 5px 10px;
+  background: none;
+  border: 1px dashed var(--text-muted);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* Tables */
+.table-wrapper { overflow-x: auto; }
+
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+
+thead th {
+  font-family: var(--pixel);
+  font-size: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  padding: 12px 10px;
+  text-align: left;
+  border-bottom: 2px solid var(--border-outer);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+thead th:hover { color: var(--gold); }
+thead th.sorted { color: var(--gold); }
+thead th .sort-arrow { margin-left: 4px; font-size: 0.4rem; }
+tbody tr { transition: background 0.1s; }
+tbody tr:hover { background: var(--bg-hover); }
+tbody td { padding: 10px; border-bottom: 1px solid rgba(139, 115, 85, 0.2); white-space: nowrap; }
+
+.cat-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: var(--pixel);
+  font-size: 0.4rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.cat-badge.Farming { background: rgba(76,175,80,0.2); color: var(--farming); border: 1px solid var(--farming); }
+.cat-badge.Foraging { background: rgba(139,195,74,0.2); color: var(--foraging); border: 1px solid var(--foraging); }
+.cat-badge.Fishing { background: rgba(33,150,243,0.2); color: var(--fishing); border: 1px solid var(--fishing); }
+.cat-badge.Mining { background: rgba(255,152,0,0.2); color: var(--mining); border: 1px solid var(--mining); }
+.cat-badge.Other { background: rgba(158,158,158,0.2); color: var(--other); border: 1px solid var(--other); }
+
+.profit-positive { color: var(--green); }
+.profit-negative { color: var(--red); }
+
+/* Fish grid */
+.fish-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+
+.fish-card {
+  background: var(--bg-panel-alt);
+  border: 2px solid var(--border-outer);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+.fish-card:hover { transform: translateY(-1px); border-color: var(--gold); }
+
+.fish-card.legendary {
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3), 0 0 24px rgba(255, 215, 0, 0.1);
+}
+
+.fish-card .legendary-badge {
+  position: absolute;
+  top: -1px; right: -1px;
+  font-family: var(--pixel);
+  font-size: 0.35rem;
+  background: var(--gold);
+  color: var(--bg-deep);
+  padding: 3px 6px;
+  letter-spacing: 1px;
+}
+
+.fish-icon { font-size: 2rem; min-width: 40px; text-align: center; }
+.fish-info .fish-name { font-family: var(--pixel); font-size: 0.55rem; color: var(--gold); margin-bottom: 4px; }
+.fish-info .fish-details { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* Comparison page */
+.comparison-selectors {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.comp-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.comp-selector-group label {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  min-width: 80px;
+}
+
+.comparison-selectors select {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border: 2px solid var(--border-outer);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.comparison-selectors select:focus { border-color: var(--gold); outline: none; }
+
+.comparison-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+
+.change-indicator { font-family: var(--pixel); font-size: 0.5rem; margin-top: 4px; }
+.change-indicator.up { color: var(--green); }
+.change-indicator.down { color: var(--red); }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.empty-state .emoji { font-size: 2.5rem; margin-bottom: 12px; }
+.empty-state .msg { font-family: var(--pixel); font-size: 0.55rem; line-height: 1.8; }
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.loading { font-family: var(--pixel); font-size: 0.5rem; color: var(--text-muted); text-align: center; padding: 40px; animation: blink 1.2s ease-in-out infinite; }
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.footer a { color: var(--text-secondary); text-decoration: none; }
+.footer a:hover { color: var(--gold); }
+.footer img { max-height: 40px; margin-top: 10px; opacity: 0.6; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .charts-row, .comparison-charts { grid-template-columns: 1fr; }
+  .overview-layout { grid-template-columns: 1fr; }
+  .overview-controls { position: static; }
+  .overview-controls .time-range-selector,
+  .overview-controls .season-tabs,
+  .overview-controls .season-tabs-inner,
+  .overview-controls .season-selector-row { flex-direction: row; }
+  .overview-controls .season-tab { width: auto; }
+  .overview-main-row { grid-template-columns: 1fr; }
+  .overview-side-col { flex-direction: row; }
+  .overview-side-col .panel { flex: 1; }
+  .summary-row { grid-template-columns: repeat(2, 1fr); }
+  .header h1 { font-size: 1.2rem; }
+  .sidebar { width: var(--sidebar-collapsed); }
+  .sidebar .nav-label, .sidebar .sidebar-title { display: none; }
+  .main-content { margin-left: var(--sidebar-collapsed); }
+  .sidebar.expanded { width: var(--sidebar-width); }
+  .sidebar.expanded .nav-label, .sidebar.expanded .sidebar-title { display: inline; }
+}
+
+@media (max-width: 550px) {
+  .summary-row { grid-template-columns: 1fr; }
+  .season-tabs { justify-content: center; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border-outer); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-inner); }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <button class="burger-btn" id="burger-btn">&#9776;</button>
+    <span class="sidebar-title">LaCompta</span>
+  </div>
+  <div class="sidebar-logo">
+    <img src="/urssaf-logo.svg" alt="URSSAF" class="urssaf-logo">
+    <span class="urssaf-text">Partenaire officiel</span>
+  </div>
+  <ul class="nav-list" id="nav-list"></ul>
+</nav>
+
+<!-- Main content -->
+<div class="main-content" id="main-content">
+  <div class="container">
+
+    <!-- Overview page -->
+    <div class="page" id="page-overview">
+      <div class="header">
+        <h1><img src="/favicon.png" alt="" class="title-logo"> La Compta</h1>
+        <div class="farm-name" id="farm-name"></div>
+        <div class="tagline" id="tagline"></div>
+      </div>
+      <div class="summary-row" id="summary-cards"></div>
+      <div class="overview-layout">
+        <div class="overview-controls">
+          <div class="panel">
+            <div class="panel-title">View</div>
+            <div class="panel-body">
+              <div class="time-range-selector" id="time-range-selector">
+                <button class="range-btn active" data-range="season">Per Season</button>
+                <button class="range-btn" data-range="year">Per Year</button>
+                <button class="range-btn" data-range="alltime">All Time</button>
+              </div>
+              <div class="season-tabs" id="overview-season-tabs"></div>
+              <div class="filter-chips" id="filter-chips"></div>
+            </div>
+          </div>
+        </div>
+        <div class="overview-charts-area">
+      <div class="overview-main-row">
+        <div class="panel overview-trend-col">
+          <div class="panel-title">Daily Income Trends</div>
+          <div class="panel-body">
+            <div class="chart-container-large"><canvas id="overview-trend-line"></canvas></div>
+            <button class="reset-zoom-btn" id="overview-trend-reset-zoom">Reset Zoom</button>
+          </div>
+        </div>
+        <div class="overview-side-col">
+          <div class="panel">
+            <div class="panel-title">Income Distribution</div>
+            <div class="panel-body"><div class="chart-container"><canvas id="overview-doughnut"></canvas></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Category Showdown</div>
+            <div class="panel-body"><div class="chart-container"><canvas id="overview-bar"></canvas></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="overview-alltime-panel" style="display:none;">
+        <div class="panel-title">Income Over All Seasons</div>
+        <div class="panel-body">
+          <div class="chart-container-large"><canvas id="overview-alltime-area"></canvas></div>
+          <button class="reset-zoom-btn" id="overview-reset-zoom">Reset Zoom</button>
+        </div>
+      </div>
+      <div class="panel" id="overview-season-table-panel" style="display:none;">
+        <div class="panel-title">Season Performance</div>
+        <div class="panel-body">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Season</th><th>Income</th><th>Expenses</th><th>Net</th><th>Best Day</th></tr></thead>
+              <tbody id="overview-alltime-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison page -->
+    <div class="page" id="page-comparison">
+      <div class="page-title">Season Comparison</div>
+      <div class="comparison-selectors" id="comparison-selectors"></div>
+      <div class="summary-row" id="comparison-stats"></div>
+      <div class="comparison-charts">
+        <div class="panel">
+          <div class="panel-title" id="comp-title-a">Side by Side</div>
+          <div class="panel-body"><div class="chart-container"><canvas id="comp-chart-a"></canvas></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" id="comp-title-b">Difference (B - A)</div>
+          <div class="panel-body"><div class="chart-container"><canvas id="comp-chart-b"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profitability page -->
+    <div class="page" id="page-profitability">
+      <div class="page-title">Show Me The Money &#x1F4B0;</div>
+      <div class="season-tabs" id="profit-season-tabs"></div>
+      <div class="panel">
+        <div class="panel-title">Item Profitability</div>
+        <div class="panel-body">
+          <div class="table-wrapper">
+            <table id="profit-table">
+              <thead><tr>
+                <th data-sort="itemName">Item <span class="sort-arrow"></span></th>
+                <th data-sort="category">Category <span class="sort-arrow"></span></th>
+                <th data-sort="quantity">Qty <span class="sort-arrow"></span></th>
+                <th data-sort="totalPrice">Revenue <span class="sort-arrow"></span></th>
+                <th data-sort="costBasis">Cost <span class="sort-arrow"></span></th>
+                <th data-sort="profit">Profit <span class="sort-arrow"></span></th>
+              </tr></thead>
+              <tbody id="profit-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legendary page -->
+    <div class="page" id="page-legendary">
+      <div class="page-title">Hall of Legendary Catches</div>
+      <div class="fish-grid" id="fish-grid"></div>
+      <div class="footer" id="legendary-footer">
+        <img src="/urssaf-logo.png" alt="URSSAF"><br>
+        <em>"Even fish must pay taxes"</em>
+      </div>
+    </div>
+
+    <div class="footer">
+      LaCompta v0.1.0 &mdash; <a href="https://github.com/CYBERBUGJR/LaCompta" target="_blank">GitHub</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = {
+  farming:  { bg: '#4CAF50', bgAlpha: 'rgba(76,175,80,0.15)',  border: '#4CAF50' },
+  foraging: { bg: '#8BC34A', bgAlpha: 'rgba(139,195,74,0.15)', border: '#8BC34A' },
+  fishing:  { bg: '#2196F3', bgAlpha: 'rgba(33,150,243,0.15)', border: '#2196F3' },
+  mining:   { bg: '#FF9800', bgAlpha: 'rgba(255,152,0,0.15)',  border: '#FF9800' },
+  other:    { bg: '#9E9E9E', bgAlpha: 'rgba(158,158,158,0.15)',border: '#9E9E9E' },
+};
+
+const CAT_LABELS = ['Farming', 'Foraging', 'Fishing', 'Mining', 'Other'];
+const CAT_KEYS = ['farming', 'foraging', 'fishing', 'mining', 'other'];
+const CAT_COLORS = CAT_KEYS.map(k => COLORS[k].bg);
+
+const TAGLINES = [
+  '"Salut salut, c\'est Val\u00e9rie de la compta..."',
+  '"Les poireaux ne vont pas se d\u00e9clarer tout seuls."',
+  '"Pierre called. He wants his margins back."',
+  '"Another day, another gold coin for Lewis."',
+  '"This spreadsheet is brought to you by URSSAF."',
+  '"Your farm is basically a hedge fund at this point."',
+  '"Joja Corp wishes they had these numbers."',
+  '"Farming: like day trading, but with more dirt."',
+];
+
+const NAV_ITEMS = [
+  { icon: '\uD83D\uDCCA', label: 'Overview', hash: 'overview' },
+  { icon: '\u2696\uFE0F', label: 'Season Compare', hash: 'comparison' },
+  { icon: '\uD83D\uDCB0', label: 'Profitability', hash: 'profitability' },
+  { icon: '\uD83D\uDC1F', label: 'Legendary Fish', hash: 'legendary' },
+];
+
+let charts = {};
+let seasons = [];
+let summaryData = null;
+let sortState = { key: 'profit', desc: true };
+let currentOverviewSeason = null;
+let currentProfitSeason = null;
+
+/* Helpers */
+function gold(n) { return n == null ? '...' : n.toLocaleString() + 'g'; }
+
+async function fetchJson(url) {
+  try { const r = await fetch(url); if (!r.ok) throw new Error(r.statusText); return await r.json(); }
+  catch(e) { console.error('Fetch error:', url, e); return null; }
+}
+
+function seasonIcon(s) {
+  var icons = { spring: '\uD83C\uDF31', summer: '\u2600\uFE0F', fall: '\uD83C\uDF42', winter: '\u2744\uFE0F' };
+  return icons[s] || '\uD83D\uDCC5';
+}
+
+function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+function createEl(tag, attrs, children) {
+  var el = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k) {
+      var v = attrs[k];
+      if (k === 'className') el.className = v;
+      else if (k === 'textContent') el.textContent = v;
+      else el.setAttribute(k, v);
+    });
+  }
+  if (children) children.forEach(function(c) { if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return el;
+}
+
+/**
+ * Create a custom styled dropdown (no native select).
+ * Returns { el: HTMLElement, getValue: fn, setValue: fn }
+ */
+function makeCustomDropdown(options, defaultValue, onChangeCb) {
+  var wrapper = createEl('div', { className: 'custom-dropdown' });
+  var btn = createEl('div', { className: 'custom-dropdown-btn' });
+  var arrow = createEl('div', { className: 'custom-dropdown-arrow', textContent: '\u25BC' });
+  btn.appendChild(arrow);
+  wrapper.appendChild(btn);
+
+  var menu = createEl('div', { className: 'custom-dropdown-menu' });
+  wrapper.appendChild(menu);
+
+  var currentValue = defaultValue;
+
+  function render() {
+    // Update button text
+    var sel = options.find(function(o) { return o.value === currentValue; });
+    // Clear btn text nodes but keep arrow
+    while (btn.firstChild !== arrow && btn.firstChild) btn.removeChild(btn.firstChild);
+    btn.insertBefore(document.createTextNode(sel ? sel.label : ''), arrow);
+
+    // Rebuild menu items
+    clearChildren(menu);
+    options.forEach(function(opt) {
+      var item = createEl('div', {
+        className: 'custom-dropdown-item' + (opt.value === currentValue ? ' selected' : ''),
+        textContent: opt.label
+      });
+      item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        currentValue = opt.value;
+        wrapper.classList.remove('open');
+        render();
+        if (onChangeCb) onChangeCb(currentValue);
+      });
+      menu.appendChild(item);
+    });
+  }
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    // Close all other dropdowns
+    document.querySelectorAll('.custom-dropdown.open').forEach(function(d) {
+      if (d !== wrapper) d.classList.remove('open');
+    });
+    wrapper.classList.toggle('open');
+  });
+
+  render();
+
+  return {
+    el: wrapper,
+    getValue: function() { return currentValue; },
+    setValue: function(v) { currentValue = v; render(); },
+    setOptions: function(newOpts, newDefault) {
+      options = newOpts;
+      currentValue = newDefault !== undefined ? newDefault : (options.length > 0 ? options[0].value : '');
+      render();
+    }
+  };
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function() {
+  document.querySelectorAll('.custom-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+});
+
+function makeStatCard(label, value, tooltip, valueClass) {
+  var card = createEl('div', { className: 'stat-card' });
+  card.appendChild(createEl('div', { className: 'label', textContent: label }));
+  var valEl = createEl('div', { className: 'value' + (valueClass ? ' ' + valueClass : ''), textContent: value });
+  card.appendChild(valEl);
+  if (tooltip) card.appendChild(createEl('div', { className: 'tooltip-text', textContent: tooltip }));
+  return card;
+}
+
+/**
+ * Stock-ticker style card: [arrow] label  value  (pct%)
+ * @param {string} label - Card label
+ * @param {number} change - The numeric change value
+ * @param {string} pct - Percentage string
+ * @param {boolean} positiveIsGood - true if positive change = green, false if positive = red (expenses)
+ */
+function makeStockCard(label, change, pct, positiveIsGood) {
+  var isPositive = change >= 0;
+  var isGood = positiveIsGood ? isPositive : !isPositive;
+  var colorClass = isGood ? 'stock-up' : 'stock-down';
+
+  var card = createEl('div', { className: 'stat-card stock-card' });
+
+  // Top row: label
+  card.appendChild(createEl('div', { className: 'label', textContent: label }));
+
+  // Main row: arrow + value + (pct)
+  var row = createEl('div', { className: 'stock-row' });
+
+  // Arrow
+  var arrow = createEl('div', { className: 'stock-arrow ' + colorClass });
+  arrow.textContent = isGood ? '\u25B2' : '\u25BC';
+  row.appendChild(arrow);
+
+  // Value
+  var sign = change >= 0 ? '+' : '';
+  row.appendChild(createEl('div', { className: 'stock-value ' + colorClass, textContent: sign + gold(change) }));
+
+  // Percentage
+  var pctSign = change >= 0 ? '+' : '';
+  row.appendChild(createEl('div', { className: 'stock-pct ' + colorClass, textContent: '(' + pctSign + pct + '%)' }));
+
+  card.appendChild(row);
+  return card;
+}
+
+function destroyChart(name) {
+  if (charts[name]) { charts[name].destroy(); charts[name] = null; }
+}
+
+function seasonKey(s) { return s.season + ' Y' + s.year; }
+
+function tooltipConfig() {
+  return { backgroundColor: '#16213e', titleColor: '#e6d9a8', bodyColor: '#a89b6e', borderColor: '#8b7355', borderWidth: 1 };
+}
+
+function chartScaleColors() {
+  return {
+    ticks: { color: '#6b6245', font: { size: 9 } },
+    grid: { color: 'rgba(139,115,85,0.1)' }
+  };
+}
+
+function showEmpty(container, emoji, msg) {
+  clearChildren(container);
+  var empty = createEl('div', { className: 'empty-state' });
+  empty.appendChild(createEl('div', { className: 'emoji', textContent: emoji }));
+  empty.appendChild(createEl('div', { className: 'msg', textContent: msg }));
+  container.appendChild(empty);
+}
+
+function showLoading(container) {
+  clearChildren(container);
+  container.appendChild(createEl('div', { className: 'loading', textContent: 'Loading...' }));
+}
+
+/* Build season tabs into a container, calling cb(season, year, tabEl) on click */
+function buildSeasonTabs(container, activeSeason, activeYear, cb) {
+  clearChildren(container);
+  if (seasons.length === 0) {
+    showEmpty(container, '\uD83D\uDD73\uFE0F', 'No data yet... your farm is a financial black hole');
+    return;
+  }
+
+  // Get unique years
+  var years = [];
+  seasons.forEach(function(s) { if (years.indexOf(s.year) === -1) years.push(s.year); });
+
+  // Wrapper row: year dropdown + season tabs
+  var row = createEl('div', { className: 'season-selector-row' });
+
+  // Custom year dropdown
+  var yearOpts = years.map(function(yr) { return { value: String(yr), label: 'Year ' + yr }; });
+  var yearDd = makeCustomDropdown(yearOpts, String(activeYear), function(val) {
+    activeYear = parseInt(val);
+    renderSeasonTabs(activeYear);
+  });
+  row.appendChild(yearDd.el);
+
+  // Season tabs container
+  var tabsWrap = createEl('div', { className: 'season-tabs-inner' });
+  row.appendChild(tabsWrap);
+  container.appendChild(row);
+
+  function renderSeasonTabs(year) {
+    clearChildren(tabsWrap);
+    var yearSeasons = seasons.filter(function(s) { return s.year === year; });
+    yearSeasons.forEach(function(s) {
+      var isActive = s.season === activeSeason && s.year === activeYear;
+      var tab = createEl('div', {
+        className: 'season-tab ' + s.season + (isActive ? ' active' : ''),
+        textContent: seasonIcon(s.season) + ' ' + s.season
+      });
+      tab.addEventListener('click', function() {
+        tabsWrap.querySelectorAll('.season-tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        activeSeason = s.season;
+        activeYear = s.year;
+        cb(s.season, s.year, tab);
+      });
+      tabsWrap.appendChild(tab);
+    });
+    var match = yearSeasons.find(function(s) { return s.season === activeSeason; });
+    if (!match && yearSeasons.length > 0) {
+      match = yearSeasons[yearSeasons.length - 1];
+      activeSeason = match.season;
+      activeYear = match.year;
+    }
+    if (match) {
+      tabsWrap.querySelectorAll('.season-tab').forEach(function(t) { t.classList.remove('active'); });
+      var activeTab = tabsWrap.querySelector('.season-tab.' + match.season);
+      if (activeTab) activeTab.classList.add('active');
+      cb(match.season, match.year, activeTab);
+    }
+  }
+
+  renderSeasonTabs(activeYear);
+}
+
+/* ========== SIDEBAR & ROUTING ========== */
+function buildNav() {
+  var list = document.getElementById('nav-list');
+  NAV_ITEMS.forEach(function(item) {
+    var li = createEl('li', { className: 'nav-item', 'data-hash': item.hash });
+    li.appendChild(createEl('span', { className: 'nav-icon', textContent: item.icon }));
+    li.appendChild(createEl('span', { className: 'nav-label', textContent: item.label }));
+    li.addEventListener('click', function() {
+      window.location.hash = '#' + item.hash;
+    });
+    list.appendChild(li);
+  });
+}
+
+function navigate(hash) {
+  if (!hash || hash === '#') hash = '#overview';
+  var page = hash.replace('#', '');
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  var target = document.getElementById('page-' + page);
+  if (target) target.classList.add('active');
+  else {
+    var ov = document.getElementById('page-overview');
+    if (ov) ov.classList.add('active');
+    page = 'overview';
+  }
+  document.querySelectorAll('.nav-item').forEach(function(n) {
+    n.classList.toggle('active', n.getAttribute('data-hash') === page);
+  });
+  loadPageData(page);
+}
+
+var loadedPages = {};
+
+function loadPageData(page) {
+  if (page === 'overview') loadOverviewPage();
+  else if (page === 'comparison') loadComparisonPage();
+  else if (page === 'profitability') loadProfitabilityPage();
+  else if (page === 'legendary') loadLegendaryPage();
+}
+
+/* Sidebar toggle */
+document.getElementById('burger-btn').addEventListener('click', function() {
+  var sb = document.getElementById('sidebar');
+  if (window.innerWidth <= 900) {
+    sb.classList.toggle('expanded');
+  } else {
+    sb.classList.toggle('collapsed');
+  }
+});
+
+/* ========== OVERVIEW ========== */
+var overviewRange = 'season';
+
+function setupTimeRangeSelector() {
+  document.querySelectorAll('.range-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.range-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      overviewRange = btn.getAttribute('data-range');
+      loadOverviewPage();
+    });
+  });
+}
+
+function loadOverviewPage() {
+  loadSummaryCards();
+
+  var seasonTabsEl = document.getElementById('overview-season-tabs');
+  var chartsRow = document.querySelector('#page-overview .overview-main-row');
+  var alltimePanel = document.getElementById('overview-alltime-panel');
+  var seasonTablePanel = document.getElementById('overview-season-table-panel');
+
+  if (overviewRange === 'alltime') {
+    // Hide season tabs and per-season charts, show all-time charts
+    seasonTabsEl.style.display = 'none';
+    chartsRow.style.display = 'none';
+    alltimePanel.style.display = 'block';
+    seasonTablePanel.style.display = 'block';
+    loadAlltimeCharts();
+  } else if (overviewRange === 'year') {
+    // Show season tabs filtered to years, show per-season charts
+    seasonTabsEl.style.display = 'flex';
+    chartsRow.style.display = 'grid';
+    alltimePanel.style.display = 'none';
+    seasonTablePanel.style.display = 'none';
+    buildYearTabs(seasonTabsEl);
+  } else {
+    // Per season (default)
+    seasonTabsEl.style.display = 'flex';
+    chartsRow.style.display = 'grid';
+    alltimePanel.style.display = 'none';
+    seasonTablePanel.style.display = 'none';
+    var lastSeason = seasons.length > 0 ? seasons[seasons.length - 1] : null;
+    buildSeasonTabs(
+      seasonTabsEl,
+      lastSeason ? lastSeason.season : null,
+      lastSeason ? lastSeason.year : null,
+      function(season, year) { loadOverviewCharts(season, year); }
+    );
+    if (lastSeason) loadOverviewCharts(lastSeason.season, lastSeason.year);
+  }
+}
+
+function buildYearTabs(container) {
+  clearChildren(container);
+  var years = [];
+  seasons.forEach(function(s) {
+    if (years.indexOf(s.year) === -1) years.push(s.year);
+  });
+  if (years.length === 0) {
+    showEmpty(container, '\uD83D\uDD73\uFE0F', 'No data yet...');
+    return;
+  }
+  years.forEach(function(yr, i) {
+    var isLast = i === years.length - 1;
+    var tab = createEl('div', {
+      className: 'season-tab' + (isLast ? ' active' : ''),
+      textContent: '\uD83D\uDCC5 Year ' + yr
+    });
+    tab.addEventListener('click', function() {
+      container.querySelectorAll('.season-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      loadYearCharts(yr);
+    });
+    container.appendChild(tab);
+  });
+  loadYearCharts(years[years.length - 1]);
+}
+
+function loadYearCharts(year) {
+  var yearSeasons = seasons.filter(function(s) { return s.year === year; });
+  if (yearSeasons.length === 0) return;
+
+  // Aggregate year data for doughnut
+  var totals = { farming: 0, foraging: 0, fishing: 0, mining: 0, other: 0 };
+  yearSeasons.forEach(function(s) {
+    totals.farming += s.farmingTotal;
+    totals.foraging += s.foragingTotal;
+    totals.fishing += s.fishingTotal;
+    totals.mining += s.miningTotal;
+    totals.other += s.otherTotal;
+  });
+
+  var values = CAT_KEYS.map(function(k) { return totals[k]; });
+
+  destroyChart('overviewDoughnut');
+  charts.overviewDoughnut = new Chart(document.getElementById('overview-doughnut'), {
+    type: 'doughnut',
+    data: { labels: CAT_LABELS, datasets: [{ data: values, backgroundColor: CAT_COLORS, borderColor: '#1a1a2e', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: { legend: { position: 'bottom', labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 }, padding: 12 } },
+        tooltip: Object.assign({}, tooltipConfig(), { callbacks: { label: function(ctx) { var total = ctx.dataset.data.reduce(function(a,b){return a+b;}, 0); var pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0; return ctx.label + ': ' + ctx.raw.toLocaleString() + 'g (' + pct + '%)'; } } }) } }
+  });
+
+  destroyChart('overviewBar');
+  charts.overviewBar = new Chart(document.getElementById('overview-bar'), {
+    type: 'bar',
+    data: { labels: CAT_LABELS, datasets: [{ label: 'Income', data: values, backgroundColor: CAT_COLORS.map(function(c){return c + '99';}), borderColor: CAT_COLORS, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, tooltipConfig(), { callbacks: { label: function(ctx) { return ctx.raw.toLocaleString() + 'g'; } } }) },
+      scales: { x: { ticks: { color: '#6b6245', callback: function(v) { return v.toLocaleString() + 'g'; } }, grid: { color: 'rgba(139,115,85,0.1)' } }, y: { min: 0, ticks: { color: '#a89b6e', font: { family: 'Courier New', size: 12 } }, grid: { display: false } } } }
+  });
+}
+
+async function loadAlltimeCharts() {
+  // Area chart across all seasons
+  var allDays = [];
+  var allLabels = [];
+  for (var i = 0; i < seasons.length; i++) {
+    var s = seasons[i];
+    var data = await fetchJson('/api/daily?season=' + s.season + '&year=' + s.year);
+    if (data) {
+      data.forEach(function(d) {
+        allDays.push(d);
+        allLabels.push(s.season.charAt(0).toUpperCase() + s.season.slice(1) + ' Y' + s.year + ' D' + d.day);
+      });
+    }
+  }
+
+  if (allDays.length === 0) return;
+
+  var mkDs = function(lbl, key, col) {
+    return { label: lbl, data: allDays.map(function(d){return d[key];}), borderColor: col.border, backgroundColor: col.bgAlpha, fill: true, tension: 0, pointRadius: 0 };
+  };
+
+  destroyChart('overviewAlltimeArea');
+  charts.overviewAlltimeArea = new Chart(document.getElementById('overview-alltime-area'), {
+    type: 'line',
+    data: { labels: allLabels, datasets: [mkDs('Farming','farmingIncome',COLORS.farming), mkDs('Foraging','foragingIncome',COLORS.foraging), mkDs('Fishing','fishingIncome',COLORS.fishing), mkDs('Mining','miningIncome',COLORS.mining), mkDs('Other','otherIncome',COLORS.other)] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 } } },
+        tooltip: Object.assign({}, tooltipConfig(), { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw.toLocaleString() + 'g'; } } }),
+        zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
+      },
+      scales: {
+        x: { ticks: { color: '#6b6245', font: { size: 7 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 30 }, grid: { color: 'rgba(139,115,85,0.1)' } },
+        y: { min: 0, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString() + 'g';} }, grid: { color: 'rgba(139,115,85,0.1)' }, stacked: true }
+      }
+    }
+  });
+
+  document.getElementById('overview-reset-zoom').onclick = function() {
+    if (charts.overviewAlltimeArea) charts.overviewAlltimeArea.resetZoom();
+  };
+
+  // Season performance table
+  var tbody = document.getElementById('overview-alltime-tbody');
+  clearChildren(tbody);
+  seasons.forEach(function(s) {
+    var total = s.farmingTotal + s.foragingTotal + s.fishingTotal + s.miningTotal + s.otherTotal;
+    var net = total - s.totalExpenses;
+    var tr = createEl('tr');
+    tr.appendChild(createEl('td', { textContent: seasonIcon(s.season) + ' ' + s.season + ' Y' + s.year }));
+    tr.appendChild(createEl('td', { textContent: total.toLocaleString() + 'g' }));
+    tr.appendChild(createEl('td', { textContent: s.totalExpenses.toLocaleString() + 'g' }));
+    var netTd = createEl('td', { textContent: (net >= 0 ? '+' : '') + net.toLocaleString() + 'g', className: net >= 0 ? 'profit-positive' : 'profit-negative' });
+    tr.appendChild(netTd);
+    tr.appendChild(createEl('td', { textContent: 'Day ' + s.bestDay + ' (' + s.bestDayIncome.toLocaleString() + 'g)' }));
+    tbody.appendChild(tr);
+  });
+}
+
+/* Money falling effect */
+function spawnMoneyParticles(card) {
+  var symbols = ['\uD83D\uDCB0', '\uD83D\uDCB5', '\uD83D\uDCB2', '\u2728', '\uD83E\uDE99'];
+  for (var i = 0; i < 6; i++) {
+    var particle = document.createElement('span');
+    particle.className = 'money-particle';
+    particle.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    particle.style.left = Math.random() * 80 + 10 + '%';
+    particle.style.top = '-10px';
+    particle.style.animationDuration = (0.8 + Math.random() * 0.8) + 's';
+    particle.style.animationDelay = (Math.random() * 0.3) + 's';
+    card.appendChild(particle);
+    setTimeout(function(p) { if (p.parentNode) p.parentNode.removeChild(p); }, 2000, particle);
+  }
+}
+
+function loadSummaryCards() {
+  var container = document.getElementById('summary-cards');
+  clearChildren(container);
+  if (!summaryData) {
+    showLoading(container);
+    return;
+  }
+  var net = summaryData.totalIncome - summaryData.totalExpenses;
+  var expenseClass = summaryData.totalExpenses > summaryData.totalIncome ? 'negative' : '';
+
+  // Season-over-season differential
+  var diffText = '--';
+  var diffClass = '';
+  var diffTooltip = 'Need 2+ years of data';
+  if (seasons.length >= 2) {
+    var last = seasons[seasons.length - 1];
+    // Find same season from previous year
+    var prev = seasons.find(function(s) { return s.season === last.season && s.year === last.year - 1; });
+    if (prev) {
+      var lastTotal = last.farmingTotal + last.foragingTotal + last.fishingTotal + last.miningTotal + last.otherTotal;
+      var prevTotal = prev.farmingTotal + prev.foragingTotal + prev.fishingTotal + prev.miningTotal + prev.otherTotal;
+      var diff = lastTotal - prevTotal;
+      var pct = prevTotal > 0 ? ((diff / prevTotal) * 100).toFixed(1) : '0';
+      diffText = (diff >= 0 ? '+' : '') + gold(diff);
+      diffClass = diff >= 0 ? 'positive' : 'negative';
+      diffTooltip = (diff >= 0 ? '\u25B2 ' : '\u25BC ') + pct + '% vs ' + prev.season + ' Y' + prev.year;
+    }
+  }
+
+  var cards = [
+    makeStatCard('Total Income', gold(summaryData.totalIncome), null),
+    makeStatCard('Total Expenses', gold(summaryData.totalExpenses), null, expenseClass),
+    makeStatCard('Net Profit', gold(net), null, net >= 0 ? 'positive' : 'negative'),
+    makeStatCard('vs Last Year', diffText, diffTooltip, diffClass)
+  ];
+  cards.forEach(function(card) {
+    card.addEventListener('mouseenter', function() { spawnMoneyParticles(card); });
+    container.appendChild(card);
+  });
+}
+
+/* ========== MULTI-FILTER SYSTEM ========== */
+var activeFilters = []; // array of category indices (0=Farming, 1=Foraging, etc.)
+var cachedOverviewSummary = null; // current season summary for chart updates
+
+function toggleFilter(catIndex) {
+  var pos = activeFilters.indexOf(catIndex);
+  if (pos >= 0) {
+    activeFilters.splice(pos, 1);
+  } else {
+    activeFilters.push(catIndex);
+  }
+  applyFilters();
+}
+
+function removeFilter(catIndex) {
+  var pos = activeFilters.indexOf(catIndex);
+  if (pos >= 0) activeFilters.splice(pos, 1);
+  applyFilters();
+}
+
+function clearAllFilters() {
+  activeFilters = [];
+  applyFilters();
+}
+
+function applyFilters() {
+  renderFilterChips();
+  updateTrendForFilters();
+  updateDoughnutForFilters();
+  updateBarForFilters();
+  updateSummaryForFilters();
+}
+
+function renderFilterChips() {
+  var container = document.getElementById('filter-chips');
+  clearChildren(container);
+  if (activeFilters.length === 0) return;
+
+  activeFilters.forEach(function(idx) {
+    var chip = createEl('div', { className: 'filter-chip ' + CAT_LABELS[idx] });
+    chip.appendChild(document.createTextNode(CAT_LABELS[idx]));
+    var x = createEl('span', { className: 'chip-x', textContent: '\u2715' });
+    x.addEventListener('click', function() { removeFilter(idx); });
+    chip.appendChild(x);
+    container.appendChild(chip);
+  });
+
+  var clearBtn = createEl('button', { className: 'filter-clear-btn', textContent: 'Clear all' });
+  clearBtn.addEventListener('click', clearAllFilters);
+  container.appendChild(clearBtn);
+}
+
+function isFilterActive() { return activeFilters.length > 0; }
+
+function isCatVisible(idx) {
+  return !isFilterActive() || activeFilters.indexOf(idx) >= 0;
+}
+
+function updateTrendForFilters() {
+  if (!charts.overviewTrendLine) return;
+  charts.overviewTrendLine.data.datasets.forEach(function(ds, i) {
+    ds.hidden = isFilterActive() && !isCatVisible(i);
+  });
+  charts.overviewTrendLine.update();
+}
+
+function updateDoughnutForFilters() {
+  if (!charts.overviewDoughnut || !cachedOverviewSummary) return;
+  var s = cachedOverviewSummary;
+  var allVals = [s.farmingTotal, s.foragingTotal, s.fishingTotal, s.miningTotal, s.otherTotal];
+  var ds = charts.overviewDoughnut.data.datasets[0];
+  // Keep all data but dim non-active segments
+  ds.data = allVals;
+  if (isFilterActive()) {
+    ds.backgroundColor = CAT_COLORS.map(function(c, i) {
+      return isCatVisible(i) ? c : c + '22';
+    });
+    ds.borderColor = CAT_COLORS.map(function(c, i) {
+      return isCatVisible(i) ? '#1a1a2e' : '#1a1a2e';
+    });
+    ds.borderWidth = CAT_COLORS.map(function(c, i) {
+      return isCatVisible(i) ? 4 : 1;
+    });
+  } else {
+    ds.backgroundColor = CAT_COLORS;
+    ds.borderColor = '#1a1a2e';
+    ds.borderWidth = 3;
+  }
+  charts.overviewDoughnut.update();
+}
+
+function updateBarForFilters() {
+  if (!charts.overviewBar || !cachedOverviewSummary) return;
+  var s = cachedOverviewSummary;
+  var allVals = [s.farmingTotal, s.foragingTotal, s.fishingTotal, s.miningTotal, s.otherTotal];
+  var ds = charts.overviewBar.data.datasets[0];
+  ds.data = allVals;
+  if (isFilterActive()) {
+    ds.backgroundColor = CAT_COLORS.map(function(c, i) {
+      return isCatVisible(i) ? c + '99' : c + '15';
+    });
+    ds.borderColor = CAT_COLORS.map(function(c, i) {
+      return isCatVisible(i) ? c : c + '33';
+    });
+  } else {
+    ds.backgroundColor = CAT_COLORS.map(function(c) { return c + '99'; });
+    ds.borderColor = CAT_COLORS;
+  }
+  charts.overviewBar.update();
+}
+
+function updateSummaryForFilters() {
+  var container = document.getElementById('summary-cards');
+  if (!container || !summaryData) return;
+
+  var incomeEl = container.querySelector('.stat-card:nth-child(1) .value');
+  var expenseEl = container.querySelector('.stat-card:nth-child(2) .value');
+  var netEl = container.querySelector('.stat-card:nth-child(3) .value');
+  if (!incomeEl || !expenseEl || !netEl) return;
+
+  if (!isFilterActive()) {
+    incomeEl.textContent = gold(summaryData.totalIncome);
+    expenseEl.textContent = gold(summaryData.totalExpenses);
+    var net = summaryData.totalIncome - summaryData.totalExpenses;
+    netEl.textContent = gold(net);
+    netEl.className = 'value ' + (net >= 0 ? 'positive' : 'negative');
+    expenseEl.className = 'value ' + (summaryData.totalExpenses > summaryData.totalIncome ? 'negative' : '');
+  } else {
+    var catKeys = ['farming', 'foraging', 'fishing', 'mining', 'other'];
+    var filteredIncome = 0;
+    var filterNames = [];
+    activeFilters.forEach(function(idx) {
+      filteredIncome += summaryData.categories ? (summaryData.categories[catKeys[idx]] || 0) : 0;
+      filterNames.push(CAT_LABELS[idx]);
+    });
+    incomeEl.textContent = gold(filteredIncome) + ' (' + filterNames.join('+') + ')';
+    expenseEl.textContent = 'N/A';
+    expenseEl.className = 'value';
+    netEl.textContent = 'N/A';
+    netEl.className = 'value';
+  }
+}
+
+function handleChartClick(evt, elements, chart) {
+  if (!elements || elements.length === 0) return;
+  var idx = elements[0].index;
+  toggleFilter(idx);
+}
+
+async function loadOverviewCharts(season, year) {
+  var summary = seasons.find(function(s) { return s.season === season && s.year === year; });
+  if (!summary) return;
+  cachedOverviewSummary = summary;
+  activeFilters = [];
+  renderFilterChips();
+  var values = [summary.farmingTotal, summary.foragingTotal, summary.fishingTotal, summary.miningTotal, summary.otherTotal];
+
+  /* Main trend line chart */
+  var dailyData = await fetchJson('/api/daily?season=' + season + '&year=' + year);
+  if (dailyData && dailyData.length > 0) {
+    var labels = dailyData.map(function(d) { return 'Day ' + d.day; });
+    var mkDs = function(lbl, key, col) {
+      return { label: lbl, data: dailyData.map(function(d){return d[key];}), borderColor: col.border, backgroundColor: col.bgAlpha, fill: false, tension: 0, pointRadius: 2 };
+    };
+    destroyChart('overviewTrendLine');
+    charts.overviewTrendLine = new Chart(document.getElementById('overview-trend-line'), {
+      type: 'line',
+      data: { labels: labels, datasets: [mkDs('Farming','farmingIncome',COLORS.farming), mkDs('Foraging','foragingIncome',COLORS.foraging), mkDs('Fishing','fishingIncome',COLORS.fishing), mkDs('Mining','miningIncome',COLORS.mining), mkDs('Other','otherIncome',COLORS.other)] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        onClick: function(evt, elements) {
+          if (!elements || elements.length === 0) return;
+          var idx = elements[0].index;
+          var chart = charts.overviewTrendLine;
+          if (!chart) return;
+          // Zoom to clicked day +/- 1
+          var minIdx = Math.max(0, idx - 1);
+          var maxIdx = Math.min(labels.length - 1, idx + 1);
+          chart.options.scales.x.min = minIdx;
+          chart.options.scales.x.max = maxIdx;
+          chart.update();
+        },
+        plugins: {
+          legend: { labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 } } },
+          tooltip: Object.assign({}, tooltipConfig(), {
+            callbacks: {
+              label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw.toLocaleString() + 'g'; },
+              footer: function() { return 'Click to zoom on this day'; }
+            }
+          }),
+          zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#6b6245', font: { size: 9 } },
+            grid: { color: 'rgba(139,115,85,0.1)' },
+            min: Math.max(0, labels.length - 14),
+            max: labels.length - 1
+          },
+          y: { min: 0, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString()+'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } }
+        }
+      }
+    });
+    document.getElementById('overview-trend-reset-zoom').onclick = function() {
+      if (charts.overviewTrendLine) charts.overviewTrendLine.resetZoom();
+    };
+  }
+
+  /* Doughnut — click to filter trend chart */
+  activeFilter = -1;
+  destroyChart('overviewDoughnut');
+  charts.overviewDoughnut = new Chart(document.getElementById('overview-doughnut'), {
+    type: 'doughnut',
+    data: { labels: CAT_LABELS, datasets: [{ data: values, backgroundColor: CAT_COLORS, borderColor: '#1a1a2e', borderWidth: 3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      onClick: handleChartClick,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 }, padding: 12 } },
+        tooltip: Object.assign({}, tooltipConfig(), {
+          callbacks: { label: function(ctx) {
+            var total = ctx.dataset.data.reduce(function(a,b){return a+b;},0);
+            var pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+            return ctx.label + ': ' + ctx.raw.toLocaleString() + 'g (' + pct + '%) — click to filter';
+          }}
+        })
+      }
+    }
+  });
+
+  /* Horizontal bar — click to filter trend chart */
+  destroyChart('overviewBar');
+  charts.overviewBar = new Chart(document.getElementById('overview-bar'), {
+    type: 'bar',
+    data: { labels: CAT_LABELS, datasets: [{ label: 'Income', data: values, backgroundColor: CAT_COLORS.map(function(c){return c+'99';}), borderColor: CAT_COLORS, borderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      onClick: handleChartClick,
+      plugins: {
+        legend: { display: false },
+        tooltip: Object.assign({}, tooltipConfig(), {
+          callbacks: { label: function(ctx) { return ctx.raw.toLocaleString() + 'g — click to filter'; } }
+        })
+      },
+      scales: {
+        x: { min: 0, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString()+'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } },
+        y: { min: 0, ticks: { color: '#a89b6e', font: { family: 'Courier New', size: 12 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* Tagline rotation */
+function rotateTags() {
+  var el = document.getElementById('tagline');
+  var i = 0;
+  el.textContent = TAGLINES[0];
+  setInterval(function() {
+    i = (i + 1) % TAGLINES.length;
+    el.style.opacity = '0';
+    setTimeout(function() { el.textContent = TAGLINES[i]; el.style.opacity = '1'; }, 400);
+  }, 5000);
+}
+
+/* ========== COMPARISON ========== */
+function buildCompSelector(container, label, defaultYear, defaultSeason, onChange) {
+  var years = [];
+  seasons.forEach(function(s) { if (years.indexOf(s.year) === -1) years.push(s.year); });
+
+  var wrap = createEl('div', { className: 'comp-selector-group' });
+  wrap.appendChild(createEl('label', { textContent: label }));
+
+  var currentYear = defaultYear;
+  var currentSeason = defaultSeason;
+
+  // Custom year dropdown
+  var yearOpts = years.map(function(yr) { return { value: String(yr), label: 'Year ' + yr }; });
+  var yearDd = makeCustomDropdown(yearOpts, String(defaultYear), function(val) {
+    currentYear = parseInt(val);
+    var yearSeasons = seasons.filter(function(s) { return s.year === currentYear; });
+    var seasonOpts = yearSeasons.map(function(s) { return { value: s.season, label: seasonIcon(s.season) + ' ' + s.season }; });
+    var matchSeason = yearSeasons.find(function(s) { return s.season === currentSeason; });
+    var defSeason = matchSeason ? currentSeason : (yearSeasons.length > 0 ? yearSeasons[0].season : '');
+    seasonDd.setOptions(seasonOpts, defSeason);
+    currentSeason = defSeason;
+    onChange(currentYear, currentSeason);
+  });
+
+  // Custom season dropdown
+  var initYearSeasons = seasons.filter(function(s) { return s.year === defaultYear; });
+  var seasonOpts = initYearSeasons.map(function(s) { return { value: s.season, label: seasonIcon(s.season) + ' ' + s.season }; });
+  var seasonDd = makeCustomDropdown(seasonOpts, defaultSeason, function(val) {
+    currentSeason = val;
+    onChange(currentYear, currentSeason);
+  });
+
+  wrap.appendChild(yearDd.el);
+  wrap.appendChild(seasonDd.el);
+  container.appendChild(wrap);
+
+  return { getYear: function() { return currentYear; }, getSeason: function() { return currentSeason; } };
+}
+
+function loadComparisonPage() {
+  var container = document.getElementById('comparison-selectors');
+  clearChildren(container);
+
+  if (seasons.length < 2) {
+    showEmpty(container, '\u2696\uFE0F', 'Need at least 2 seasons to compare');
+    return;
+  }
+
+  // Default: current season vs same season previous year
+  var current = seasons[seasons.length - 1];
+  var previous = seasons.find(function(s) {
+    return s.season === current.season && s.year === current.year - 1;
+  });
+  // Fallback: if no same season last year, use second-to-last
+  if (!previous) previous = seasons.length >= 2 ? seasons[seasons.length - 2] : seasons[0];
+
+  var selectorA, selectorB;
+
+  function doCompare() {
+    var a = seasons.find(function(s) { return s.year === selectorA.getYear() && s.season === selectorA.getSeason(); });
+    var b = seasons.find(function(s) { return s.year === selectorB.getYear() && s.season === selectorB.getSeason(); });
+    if (a && b) renderComparison(a, b);
+  }
+
+  selectorA = buildCompSelector(container, 'Season A:', previous.year, previous.season, doCompare);
+  selectorB = buildCompSelector(container, 'Season B:', current.year, current.season, doCompare);
+
+  doCompare();
+}
+
+function renderComparison(a, b) {
+  var titleA = document.getElementById('comp-title-a');
+  var titleB = document.getElementById('comp-title-b');
+  titleA.textContent = seasonIcon(a.season) + ' ' + a.season + ' Y' + a.year;
+  titleB.textContent = seasonIcon(b.season) + ' ' + b.season + ' Y' + b.year;
+
+  var valsA = [a.farmingTotal, a.foragingTotal, a.fishingTotal, a.miningTotal, a.otherTotal];
+  var valsB = [b.farmingTotal, b.foragingTotal, b.fishingTotal, b.miningTotal, b.otherTotal];
+  var totalA = valsA.reduce(function(x,y){return x+y;},0);
+  var totalB = valsB.reduce(function(x,y){return x+y;},0);
+
+  /* Stat cards — stock ticker style */
+  var statsContainer = document.getElementById('comparison-stats');
+  clearChildren(statsContainer);
+
+  var incomeChange = totalB - totalA;
+  var incomePct = totalA > 0 ? ((incomeChange / totalA) * 100).toFixed(1) : '0.0';
+  statsContainer.appendChild(makeStockCard('Income', incomeChange, incomePct, true));
+
+  var expChange = b.totalExpenses - a.totalExpenses;
+  var expPct = a.totalExpenses > 0 ? ((expChange / a.totalExpenses) * 100).toFixed(1) : '0.0';
+  statsContainer.appendChild(makeStockCard('Expenses', expChange, expPct, false));
+
+  var netA = totalA - a.totalExpenses;
+  var netB = totalB - b.totalExpenses;
+  var netChange = netB - netA;
+  var netPct = netA > 0 ? ((netChange / netA) * 100).toFixed(1) : '0.0';
+  statsContainer.appendChild(makeStockCard('Net Profit', netChange, netPct, true));
+
+  var bestChange = b.bestDayIncome - a.bestDayIncome;
+  var bestPct = a.bestDayIncome > 0 ? ((bestChange / a.bestDayIncome) * 100).toFixed(1) : '0.0';
+  statsContainer.appendChild(makeStockCard('Best Day', bestChange, bestPct, true));
+
+  /* Chart A — with difference annotations */
+  var diffs = valsA.map(function(v, i) { return valsB[i] - v; });
+
+  destroyChart('compA');
+  charts.compA = new Chart(document.getElementById('comp-chart-a'), {
+    type: 'bar',
+    data: {
+      labels: CAT_LABELS,
+      datasets: [
+        { label: seasonKey(a), data: valsA, backgroundColor: CAT_COLORS.map(function(c){return c+'66';}), borderColor: CAT_COLORS, borderWidth: 2 },
+        { label: seasonKey(b), data: valsB, backgroundColor: CAT_COLORS.map(function(c){return c+'cc';}), borderColor: CAT_COLORS, borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 } } },
+        tooltip: Object.assign({}, tooltipConfig(), {
+          callbacks: {
+            afterBody: function(items) {
+              var idx = items[0].dataIndex;
+              var diff = diffs[idx];
+              var sign = diff >= 0 ? '+' : '';
+              return 'Diff: ' + sign + diff.toLocaleString() + 'g';
+            }
+          }
+        })
+      },
+      scales: {
+        y: { min: 0, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString()+'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } },
+        x: { ticks: { color: '#a89b6e' }, grid: { display: false } }
+      }
+    }
+  });
+
+  /* Chart B — difference chart (B - A) */
+  var diffColors = diffs.map(function(d) { return d >= 0 ? 'rgba(46,204,113,0.7)' : 'rgba(231,76,60,0.7)'; });
+  var diffBorders = diffs.map(function(d) { return d >= 0 ? '#2ecc71' : '#e74c3c'; });
+
+  destroyChart('compB');
+  charts.compB = new Chart(document.getElementById('comp-chart-b'), {
+    type: 'bar',
+    data: {
+      labels: CAT_LABELS,
+      datasets: [{ label: 'Difference (B - A)', data: diffs, backgroundColor: diffColors, borderColor: diffBorders, borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 } } },
+        tooltip: Object.assign({}, tooltipConfig(), {
+          callbacks: { label: function(ctx) { var v = ctx.raw; return (v >= 0 ? '+' : '') + v.toLocaleString() + 'g'; } }
+        })
+      },
+      scales: {
+        y: { ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString()+'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } },
+        x: { ticks: { color: '#a89b6e' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* ========== PROFITABILITY ========== */
+function loadProfitabilityPage() {
+  var defSeason = currentProfitSeason || (seasons[0] && seasons[0].season);
+  var defYear = (currentProfitSeason && currentProfitSeason._year) || (seasons[0] && seasons[0].year);
+  buildSeasonTabs(
+    document.getElementById('profit-season-tabs'),
+    defSeason, defYear,
+    function(season, year) {
+      currentProfitSeason = season;
+      currentProfitSeason._year = year;
+      loadProfitTable(season, year);
+    }
+  );
+  if (seasons.length > 0) loadProfitTable(seasons[0].season, seasons[0].year);
+
+  /* Sort handler */
+  document.querySelectorAll('#profit-table thead th').forEach(function(th) {
+    th.onclick = function() {
+      var key = th.dataset.sort;
+      if (!key) return;
+      if (sortState.key === key) sortState.desc = !sortState.desc;
+      else { sortState.key = key; sortState.desc = true; }
+      var s0 = seasons[0];
+      if (s0) loadProfitTable(currentProfitSeason || s0.season, (currentProfitSeason && currentProfitSeason._year) || s0.year);
+    };
+  });
+}
+
+async function loadProfitTable(season, year) {
+  var data = await fetchJson('/api/profitability?season=' + season + '&year=' + year + '&limit=50');
+  var tbody = document.getElementById('profit-tbody');
+  clearChildren(tbody);
+
+  if (!data || !data.length) {
+    var tr = createEl('tr');
+    var td = createEl('td', { colspan: '6' });
+    showEmpty(td, '\uD83D\uDCED', 'The shipping bin is judging you');
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  var items = data.map(function(d) { return Object.assign({}, d, { profit: d.totalPrice - d.costBasis }); });
+  items.sort(function(a, b) {
+    var va = a[sortState.key], vb = b[sortState.key];
+    if (typeof va === 'string') return sortState.desc ? vb.localeCompare(va) : va.localeCompare(vb);
+    return sortState.desc ? vb - va : va - vb;
+  });
+
+  items.forEach(function(d) {
+    var tr = createEl('tr');
+    tr.appendChild(createEl('td', { textContent: d.itemName }));
+    var catTd = createEl('td');
+    catTd.appendChild(createEl('span', { className: 'cat-badge ' + d.category, textContent: d.category }));
+    tr.appendChild(catTd);
+    tr.appendChild(createEl('td', { textContent: String(d.quantity) }));
+    tr.appendChild(createEl('td', { textContent: d.totalPrice.toLocaleString() + 'g' }));
+    tr.appendChild(createEl('td', { textContent: d.costBasis.toLocaleString() + 'g' }));
+    tr.appendChild(createEl('td', {
+      className: d.profit >= 0 ? 'profit-positive' : 'profit-negative',
+      textContent: (d.profit >= 0 ? '+' : '') + d.profit.toLocaleString() + 'g'
+    }));
+    tbody.appendChild(tr);
+  });
+
+  document.querySelectorAll('#profit-table thead th').forEach(function(th) {
+    var key = th.dataset.sort;
+    th.classList.toggle('sorted', key === sortState.key);
+    var arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = key === sortState.key ? (sortState.desc ? '\u25BC' : '\u25B2') : '';
+  });
+}
+
+/* ========== LEGENDARY ========== */
+async function loadLegendaryPage() {
+  var grid = document.getElementById('fish-grid');
+  showLoading(grid);
+  var data = await fetchJson('/api/fish');
+  clearChildren(grid);
+
+  if (!data || !data.length) {
+    showEmpty(grid, '\uD83D\uDC1F', 'Willy is disappointed in you');
+    return;
+  }
+
+  /* Sort: legendary first, then by revenue */
+  data.sort(function(a, b) {
+    if (a.isLegendary && !b.isLegendary) return -1;
+    if (!a.isLegendary && b.isLegendary) return 1;
+    return b.totalRevenue - a.totalRevenue;
+  });
+
+  data.forEach(function(f) {
+    var card = createEl('div', { className: 'fish-card' + (f.isLegendary ? ' legendary' : '') });
+    if (f.isLegendary) {
+      card.appendChild(createEl('div', { className: 'legendary-badge', textContent: '\u2605 LEGENDARY' }));
+    }
+    var iconText = f.isLegendary ? '\uD83D\uDC51' : '\uD83D\uDC20';
+    card.appendChild(createEl('div', { className: 'fish-icon', textContent: iconText }));
+    var info = createEl('div', { className: 'fish-info' });
+    info.appendChild(createEl('div', { className: 'fish-name', textContent: f.fishName }));
+    var details = f.totalRevenue.toLocaleString() + 'g';
+    if (f.season) details += ' \u00B7 ' + seasonIcon(f.season) + ' ' + f.season + ' Y' + f.year + ' Day ' + f.day;
+    if (f.quantity > 1) details += ' \u00B7 x' + f.quantity;
+    info.appendChild(createEl('div', { className: 'fish-details', textContent: details }));
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+}
+
+/* ========== INIT ========== */
+async function init() {
+  setupTimeRangeSelector();
+  buildNav();
+  rotateTags();
+
+  summaryData = await fetchJson('/api/summary');
+  seasons = await fetchJson('/api/seasons') || [];
+
+  // Load farm name
+  var farmInfo = await fetchJson('/api/farminfo');
+  if (farmInfo && farmInfo.farmName) {
+    document.getElementById('farm-name').textContent = farmInfo.farmName + ' Farm — ' + farmInfo.playerName;
+  }
+
+  window.addEventListener('hashchange', function() { navigate(window.location.hash); });
+  navigate(window.location.hash);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -186,6 +186,22 @@ namespace LaCompta.Data
             return fish;
         }
 
+        public List<FishRecord> GetAllFish(string playerId = "")
+        {
+            using var conn = _db.GetConnection();
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT * FROM fish_records WHERE ($playerId = '' OR player_id = $playerId) ORDER BY year, day";
+            cmd.Parameters.AddWithValue("$playerId", playerId);
+
+            var fish = new List<FishRecord>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                fish.Add(MapFishRecord(reader));
+            }
+            return fish;
+        }
+
         // === Mappers ===
 
         private static DailyRecord MapDailyRecord(SqliteDataReader reader)

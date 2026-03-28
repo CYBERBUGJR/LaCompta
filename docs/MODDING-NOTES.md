@@ -20,7 +20,15 @@ Technical discoveries and tricks learned during LaCompta development.
 - **Legendary fish IDs** (Stardew Valley 1.6): 159 (Crimsonfish), 160 (Angler), 163 (Legend), 775 (Glacierfish), 682 (Mutant Carp), 898 (Son of Crimsonfish), 899 (Ms. Angler), 900 (Legend II), 901 (Radioactive Carp), 902 (Glacierfish Jr.)
 - **Player ID for multiplayer**: `Game1.player.UniqueMultiplayerID.ToString()` gives a stable player identifier.
 
+## Fertilizer Tracking
+
+- **HoeDirt.fertilizer.Value**: Returns the fertilizer item ID string on a tile, or null if none.
+- **Can't track per-item fertilizer**: When items are in the shipping bin, we don't know which tile they came from. Instead, we scan all farm HoeDirt tiles with crops and calculate the average fertilizer cost per crop tile.
+- **Fertilizer IDs**: 368 (Basic), 369 (Quality), 919 (Deluxe), 465 (Speed-Gro), 466 (Deluxe Speed-Gro), 918 (Hyper Speed-Gro), 370/371/920 (Retaining Soil).
+- **Access pattern**: `foreach (var pair in farm.terrainFeatures.Pairs) { if (pair.Value is HoeDirt hd && hd.crop != null) ... }`
+
 ## Performance Considerations
 
 - **SQLite in SMAPI**: SQLite operations are fast enough for end-of-day processing. No threading needed for the data layer.
 - **Shipping bin iteration**: Happens once per day at DayEnding. Even with 100+ items, negligible performance impact.
+- **Farm terrain scan**: Iterating all HoeDirt tiles on DayEnding for fertilizer estimation is fast — typical farms have <500 crop tiles.

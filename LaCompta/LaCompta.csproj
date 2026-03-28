@@ -11,6 +11,11 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.*" />
   </ItemGroup>
 
+  <!-- Include web dashboard assets in build output -->
+  <ItemGroup>
+    <Content Include="Web\Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Copy native e_sqlite3 lib to both output AND mod deploy folder.
        ModBuildConfig only copies .dll files, not .so/.dylib, so we handle it manually. -->
   <Target Name="CopyNativeSqlite" AfterTargets="Build">
@@ -22,5 +27,10 @@
     </PropertyGroup>
     <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(TargetDir)" Condition="Exists('$(NativeSqliteSrc)')" />
     <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(GameModsDir)" Condition="Exists('$(NativeSqliteSrc)') And Exists('$(GameModsDir)')" />
+    <!-- Copy Assets folder to mod deploy directory -->
+    <ItemGroup>
+      <DashboardAssets Include="$(TargetDir)Web\Assets\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DashboardAssets)" DestinationFolder="$(GameModsDir)\Assets\%(RecursiveDir)" Condition="Exists('$(GameModsDir)')" />
   </Target>
 </Project>

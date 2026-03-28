@@ -1,7 +1,9 @@
 using LaCompta.Data;
 using StardewModdingAPI;
+using StardewValley;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -14,16 +16,18 @@ namespace LaCompta.Web
     {
         private readonly Repository _repo;
         private readonly IMonitor _monitor;
+        private readonly string _assetsPath;
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true
         };
 
-        public ApiController(Repository repo, IMonitor monitor)
+        public ApiController(Repository repo, IMonitor monitor, string modPath)
         {
             _repo = repo;
             _monitor = monitor;
+            _assetsPath = Path.Combine(modPath, "Assets");
         }
 
         public void HandleRequest(string path, string query, HttpListenerResponse response)
@@ -52,8 +56,16 @@ namespace LaCompta.Web
                     case "/api/summary":
                         ServeOverallSummary(queryParams, response);
                         break;
+                    case "/api/farminfo":
+                        ServeFarmInfo(response);
+                        break;
+                    case "/api/fish":
+                        ServeAllFish(queryParams, response);
+                        break;
                     default:
-                        ServeNotFound(response);
+                        // Try serving as static asset from Assets folder
+                        if (!ServeStaticAsset(path, response))
+                            ServeNotFound(response);
                         break;
                 }
             }
@@ -99,6 +111,26 @@ namespace LaCompta.Web
             ServeJson(response, fish);
         }
 
+        private void ServeFarmInfo(HttpListenerResponse response)
+        {
+            var info = new
+            {
+                FarmName = Context.IsWorldReady ? Game1.player.farmName.Value : "Unknown Farm",
+                PlayerName = Context.IsWorldReady ? Game1.player.Name : "Unknown",
+                Season = Context.IsWorldReady ? Game1.currentSeason : "",
+                Year = Context.IsWorldReady ? Game1.year : 0,
+                Day = Context.IsWorldReady ? Game1.dayOfMonth : 0
+            };
+            ServeJson(response, info);
+        }
+
+        private void ServeAllFish(Dictionary<string, string> query, HttpListenerResponse response)
+        {
+            var playerId = query.GetValueOrDefault("playerId", "");
+            var fish = _repo.GetAllFish(playerId);
+            ServeJson(response, fish);
+        }
+
         private void ServeOverallSummary(Dictionary<string, string> query, HttpListenerResponse response)
         {
             var playerId = query.GetValueOrDefault("playerId", "");
@@ -127,35 +159,51 @@ namespace LaCompta.Web
 
         private void ServeHomePage(HttpListenerResponse response)
         {
-            var html = @"<!DOCTYPE html>
-<html>
-<head>
-    <title>LaCompta - Farm Economics Dashboard</title>
-    <style>
-        body { background: #1a1a2e; color: #e6d9a8; font-family: monospace; text-align: center; padding: 50px; }
-        h1 { font-size: 2em; }
-        .subtitle { color: #8b7355; font-style: italic; }
-        .api-links { margin-top: 30px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto; }
-        a { color: #6daedb; }
-    </style>
-</head>
-<body>
-    <h1>LaCompta</h1>
-    <p class='subtitle'>""Salut salut, c'est Valerie de la compta...""</p>
-    <p>Farm Economics Dashboard - Coming Soon!</p>
-    <div class='api-links'>
-        <h3>API Endpoints:</h3>
-        <ul>
-            <li><a href='/api/seasons'>GET /api/seasons</a> - Season summaries</li>
-            <li><a href='/api/daily?season=spring&year=1'>GET /api/daily</a> - Daily records</li>
-            <li><a href='/api/profitability?season=spring&year=1'>GET /api/profitability</a> - Top profitable items</li>
-            <li><a href='/api/fish/legendary'>GET /api/fish/legendary</a> - Legendary fish</li>
-            <li><a href='/api/summary'>GET /api/summary</a> - Overall summary</li>
-        </ul>
-    </div>
-</body>
-</html>";
-            ServeHtml(response, html);
+            var dashboardPath = Path.Combine(_assetsPath, "dashboard.html");
+            if (File.Exists(dashboardPath))
+            {
+                ServeHtml(response, File.ReadAllText(dashboardPath));
+            }
+            else
+            {
+                ServeHtml(response, "<html><body><h1>LaCompta</h1><p>Dashboard file not found. Check Assets/dashboard.html</p></body></html>");
+                _monitor.Log("Dashboard HTML not found at: " + dashboardPath, LogLevel.Warn);
+            }
+        }
+
+        private bool ServeStaticAsset(string path, HttpListenerResponse response)
+        {
+            // Sanitize path to prevent directory traversal
+            var relativePath = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            if (relativePath.Contains("..")) return false;
+
+            var filePath = Path.Combine(_assetsPath, relativePath);
+            if (!File.Exists(filePath)) return false;
+
+            var ext = Path.GetExtension(filePath).ToLower();
+            var contentType = ext switch
+            {
+                ".html" => "text/html; charset=utf-8",
+                ".css"  => "text/css; charset=utf-8",
+                ".js"   => "application/javascript; charset=utf-8",
+                ".png"  => "image/png",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".gif"  => "image/gif",
+                ".svg"  => "image/svg+xml",
+                ".ico"  => "image/x-icon",
+                ".json" => "application/json",
+                ".woff" => "font/woff",
+                ".woff2" => "font/woff2",
+                _ => "application/octet-stream"
+            };
+
+            var bytes = File.ReadAllBytes(filePath);
+            response.StatusCode = 200;
+            response.ContentType = contentType;
+            response.ContentLength64 = bytes.Length;
+            response.OutputStream.Write(bytes, 0, bytes.Length);
+            response.Close();
+            return true;
         }
 
         private void ServeNotFound(HttpListenerResponse response)

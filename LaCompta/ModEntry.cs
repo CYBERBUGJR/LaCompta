@@ -43,7 +43,7 @@ namespace LaCompta
             _seasonSummary = new SeasonSummaryService(_repo, this.Monitor);
 
             // Start web server
-            var api = new ApiController(_repo, this.Monitor);
+            var api = new ApiController(_repo, this.Monitor, this.Helper.DirectoryPath);
             _webServer = new WebServer(api, this.Monitor);
             _webServer.Start();
 
