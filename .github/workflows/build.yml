@@ -1,0 +1,35 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Setup SMAPI build environment
+        run: |
+          mkdir -p "/tmp/stardew/Stardew Valley/smapi-internal"
+          wget -q "https://github.com/Pathoschild/SMAPI/releases/download/4.5.2/SMAPI-4.5.2-installer.zip" -O /tmp/smapi.zip
+          unzip -q /tmp/smapi.zip -d /tmp/smapi-extract
+          find /tmp/smapi-extract -name "*.dll" -exec cp {} "/tmp/stardew/Stardew Valley/smapi-internal/" \; 2>/dev/null || true
+
+      - name: Restore
+        run: dotnet restore LaCompta/LaCompta.csproj
+        env:
+          GamePath: /tmp/stardew/Stardew Valley
+
+      - name: Build
+        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore
+        env:
+          GamePath: /tmp/stardew/Stardew Valley

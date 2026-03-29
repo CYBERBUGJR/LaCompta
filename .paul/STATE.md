@@ -5,60 +5,45 @@
 See: .paul/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Track, visualize, and share farm financial performance across seasons.
-**Current focus:** Phase 4 complete — ready for Phase 5
+**Current focus:** Phase 6 complete — Phase 7 (Prometheus) is nice-to-have
 
 ## Current Position
 
 Milestone: v0.1 Initial Release (v0.1.0)
-Phase: 5 of 7 (PDF Export + Polish) — Not started
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-29 — Phase 4 complete, transitioned
+Phase: 7 of 7 (Prometheus Exporter) — Not started (nice-to-have)
+Status: Core milestone nearly complete (6/7 phases done)
+Last activity: 2026-03-29 — Phase 6 complete
 
 Progress:
-- Milestone: [██████░░░░] 60%
-- Phase 4: [██████████] 100%
+- Milestone: [████████░░] 85%
 
 ## Loop Position
 
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Idle — ready for next PLAN]
+  ○        ○        ○     [Idle]
 ```
-
-## Performance Metrics
-
-**Velocity:**
-- Total plans completed: 5
-- Average duration: ~2.5h
-- Total execution time: ~11 hours
 
 ## Accumulated Context
 
-### Decisions
-- GMCM as optional soft dependency (copy interface)
-- PerScreen<T> for split-screen, regular fields for network
-- Single web server, filter by playerId
-- Runtime sprite extraction from Game1.objectSpriteSheet
-- $(GamePath) for cross-platform mod deploy
-- Phase 3 (Google Sheets) deferred — code on phase/03-google-sheets branch
+### Completed Phases
+- Phase 1: Scaffolding + Core Engine
+- Phase 2: Local Web Dashboard
+- Phase 3: Google Sheets (deferred — code on separate branch)
+- Phase 4: Multiplayer + In-Game Config
+- Phase 5: XLSX Export + Polish
+- Phase 6: CI/CD Pipeline
 
 ### Deferred Issues
 - Google Sheets verification pending (Phase 3 branch)
-- Expense tracking is money-delta approximation (needs Harmony for precision)
+- Expense tracking is money-delta approximation
 - ProfitabilityCalculator stale cache across save reloads
-- Sprites only available in-game (dev server shows no sprites)
-
-### Git State
-Last commit: 0a0a028 (phase/04-multiplayer-config)
-Branch: phase/04-multiplayer-config
+- Phase 7 (Prometheus) is nice-to-have
 
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Phase 4 complete
-Next action: Commit phase, push, create PR, then /paul:plan for Phase 5
-Resume file: .paul/ROADMAP.md
+Next action: Phase 7 (optional) or mark milestone complete
 
 ---
 *STATE.md — Updated after every significant action*

@@ -4,6 +4,10 @@
 
 <h1 align="center">LaCompta</h1>
 
+<p align="center">
+  <a href="https://github.com/CYBERBUGJR/LaCompta/actions/workflows/build.yml"><img src="https://github.com/CYBERBUGJR/LaCompta/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+</p>
+
 <p align="center"><em>"Salut salut, c'est Valérie de la compta, ouais, ouais, super écoute, je t'appelle par rapport aux poireaux que tu as oublié de déclarer à l'URSSAF"</em></p>
 
 A SMAPI mod for Stardew Valley that tracks your farm's financial performance across seasons. Because every gold coin counts.
