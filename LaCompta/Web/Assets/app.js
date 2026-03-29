@@ -185,9 +185,9 @@ function makeStockCard(label, change, pct, positiveIsGood) {
   // Main row: arrow + value + (pct)
   var row = createEl('div', { className: 'stock-row' });
 
-  // Arrow
+  // Arrow: direction matches actual change (up/down), color matches good/bad
   var arrow = createEl('div', { className: 'stock-arrow ' + colorClass });
-  arrow.textContent = isGood ? '\u25B2' : '\u25BC';
+  arrow.textContent = isPositive ? '\u25B2' : '\u25BC';
   row.appendChild(arrow);
 
   // Value
@@ -212,12 +212,8 @@ function tooltipConfig() {
   return { backgroundColor: '#16213e', titleColor: '#e6d9a8', bodyColor: '#a89b6e', borderColor: '#8b7355', borderWidth: 1 };
 }
 
-function showEmpty(container, emoji, msg) {
+function showEmpty(container) {
   clearChildren(container);
-  var empty = createEl('div', { className: 'empty-state' });
-  empty.appendChild(createEl('div', { className: 'emoji', textContent: emoji }));
-  empty.appendChild(createEl('div', { className: 'msg', textContent: msg }));
-  container.appendChild(empty);
 }
 
 function showLoading(container) {
@@ -229,7 +225,7 @@ function showLoading(container) {
 function buildSeasonTabs(container, activeSeason, activeYear, cb) {
   clearChildren(container);
   if (seasons.length === 0) {
-    showEmpty(container, '\uD83D\uDD73\uFE0F', 'No data yet... your farm is a financial black hole');
+    showEmpty(container);
     return;
   }
 
@@ -372,6 +368,31 @@ function loadOverviewPage() {
   var chartsRow = document.querySelector('#page-overview .overview-main-row');
   var alltimePanel = document.getElementById('overview-alltime-panel');
   var seasonTablePanel = document.getElementById('overview-season-table-panel');
+  var overviewLayout = document.querySelector('#page-overview .overview-layout');
+
+  var exportBtn = document.getElementById('export-xlsx-btn');
+
+  // No data: hide everything, show message
+  if (seasons.length === 0) {
+    summaryRow.style.display = 'none';
+    if (overviewLayout) overviewLayout.style.display = 'none';
+    if (exportBtn) exportBtn.style.display = 'none';
+    var noData = document.getElementById('overview-no-data');
+    if (!noData) {
+      noData = createEl('div', { className: 'empty-state', id: 'overview-no-data' });
+      noData.appendChild(createEl('div', { className: 'msg', textContent: '\uD83E\uDE99 Get to work ! \uD83E\uDE99' }));
+      document.getElementById('page-overview').appendChild(noData);
+    }
+    noData.style.display = 'block';
+    return;
+  }
+
+  // Has data: show everything, hide no-data message
+  summaryRow.style.display = '';
+  if (overviewLayout) overviewLayout.style.display = '';
+  if (exportBtn) exportBtn.style.display = '';
+  var noData2 = document.getElementById('overview-no-data');
+  if (noData2) noData2.style.display = 'none';
 
   loadSummaryCards();
 
@@ -411,7 +432,7 @@ function buildYearTabs(container) {
     if (years.indexOf(s.year) === -1) years.push(s.year);
   });
   if (years.length === 0) {
-    showEmpty(container, '\uD83D\uDD73\uFE0F', 'No data yet...');
+    showEmpty(container);
     return;
   }
   years.forEach(function(yr, i) {
@@ -600,8 +621,8 @@ function loadSummaryCards(season, year) {
 
   var container = document.getElementById('summary-cards');
   clearChildren(container);
-  if (!summaryData || seasons.length === 0) {
-    showLoading(container);
+  if (!summaryData && seasons.length === 0) {
+    showEmpty(container);
     return;
   }
 
@@ -687,6 +708,10 @@ function toggleFilter(catIndex) {
     activeFilters.splice(pos, 1);
   } else {
     activeFilters.push(catIndex);
+  }
+  // Reset filters if all 5 categories are selected
+  if (activeFilters.length >= 5) {
+    activeFilters = [];
   }
   applyFilters();
 }
@@ -1006,7 +1031,7 @@ async function loadSalesData(season, year, day) {
   if (!data || !data.length) {
     var tr = createEl('tr');
     var td = createEl('td', { colspan: '7' });
-    showEmpty(td, '\uD83D\uDCCB', 'Nothing sold yet... the shipping bin misses you');
+    showEmpty(td);
     tr.appendChild(td);
     container.appendChild(tr);
     return;
@@ -1117,7 +1142,7 @@ function loadComparisonPage() {
   clearChildren(container);
 
   if (seasons.length < 2) {
-    showEmpty(container, '\u2696\uFE0F', 'Need at least 2 seasons to compare');
+    showEmpty(container);
     return;
   }
 
@@ -1273,7 +1298,7 @@ async function loadProfitTable(season, year) {
   if (!data || !data.length) {
     var tr = createEl('tr');
     var td = createEl('td', { colspan: '6' });
-    showEmpty(td, '\uD83D\uDCED', 'The shipping bin is judging you');
+    showEmpty(td);
     tr.appendChild(td);
     tbody.appendChild(tr);
     return;
@@ -1318,7 +1343,7 @@ async function loadLegendaryPage() {
   clearChildren(grid);
 
   if (!data || !data.length) {
-    showEmpty(grid, '\uD83D\uDC1F', 'Willy is disappointed in you');
+    showEmpty(grid);
     return;
   }
 
@@ -1344,6 +1369,41 @@ async function loadLegendaryPage() {
     info.appendChild(createEl('div', { className: 'fish-details', textContent: details }));
     card.appendChild(info);
     grid.appendChild(card);
+  });
+}
+
+/* ========== EXCEL EXPORT ========== */
+function setupExportButton() {
+  var btn = document.getElementById('export-xlsx-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async function() {
+    if (btn.classList.contains('loading')) return;
+    btn.classList.add('loading');
+    btn.textContent = 'Generating...';
+    try {
+      var response = await fetch(apiUrl('/api/report/xlsx'));
+      if (!response.ok) throw new Error('Export failed');
+      var contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        var err = await response.json().catch(function() { return { error: 'Unknown error' }; });
+        alert('Export: ' + (err.error || 'No data to export. Play some days first!'));
+        return;
+      }
+      var blob = await response.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'LaCompta-report.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) {
+      console.error('Excel export error:', e);
+    } finally {
+      btn.classList.remove('loading');
+      btn.textContent = 'Export XLSX';
+    }
   });
 }
 
@@ -1381,6 +1441,7 @@ async function reloadAllData() {
 /* ========== INIT ========== */
 async function init() {
   setupTimeRangeSelector();
+  setupExportButton();
   buildNav();
   rotateTags();
 

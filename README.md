@@ -14,12 +14,15 @@ A SMAPI mod for Stardew Valley that tracks your farm's financial performance acr
 
 - Daily income tracking by category: Farming, Foraging, Fishing, Mining, Other
 - Season-by-season statistics with best day of the season
-- Item profitability analysis revenue vs seed/fertilizer costs
-- Legendary fish tracking know when you've sold a legend
-- Expense tracking where does all that gold go?
-- Local web dashboard with Stardew Valley pixel art style (coming soon)
-- Google Sheets integration sync your stats to the cloud (coming soon)
-- PDF export share your farm's performance with other players (coming soon)
+- Item profitability analysis with revenue vs seed/fertilizer costs
+- Legendary fish tracking — know when you've sold a legend
+- Expense tracking — where does all that gold go?
+- Local web dashboard with Stardew Valley pixel art style (5 pages: Overview, Season Compare, Profitability, Sales Ledger, Legendary Fish)
+- Excel XLSX export — multi-sheet report with Overview, per-season data, and Sales Ledger
+- In-game config via GMCM (Generic Mod Config Menu) — optional
+- Split-screen multiplayer support with per-player data isolation
+- Item sprites from the game's spritesheet in Sales Ledger
+- Google Sheets integration — sync your stats to the cloud (coming soon)
 
 ## Installation
 

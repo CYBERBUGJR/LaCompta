@@ -250,6 +250,31 @@ body::after {
   letter-spacing: 1px;
 }
 
+/* Export PDF button */
+.export-pdf-btn {
+  font-family: var(--pixel);
+  font-size: 0.5rem;
+  padding: 8px 20px;
+  background: var(--bg-panel);
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+  margin: 8px auto;
+  display: block;
+}
+
+.export-pdf-btn:hover {
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+.export-pdf-btn.loading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 /* Player selector */
 .player-selector {
   display: inline-flex;
@@ -1049,9 +1074,23 @@ tbody td { padding: 10px; border-bottom: 1px solid rgba(139, 115, 85, 0.2); whit
 .change-indicator.down { color: var(--red); }
 
 /* Empty state */
-.empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-.empty-state .emoji { font-size: 2.5rem; margin-bottom: 12px; }
-.empty-state .msg { font-family: var(--pixel); font-size: 0.55rem; line-height: 1.8; }
+.empty-state {
+  text-align: center;
+  padding: 120px 20px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+}
+.empty-state .msg {
+  font-family: var(--pixel);
+  font-size: 1.4rem;
+  color: var(--gold);
+  letter-spacing: 3px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+}
 
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 .loading { font-family: var(--pixel); font-size: 0.5rem; color: var(--text-muted); text-align: center; padding: 40px; animation: blink 1.2s ease-in-out infinite; }

@@ -8,7 +8,7 @@ Build a Stardew Valley SMAPI mod from zero to a full-featured farm economics tra
 
 **v0.1 Initial Release** (v0.1.0)
 Status: In progress
-Phases: 3 of 7 complete
+Phases: 4 of 7 complete
 
 ## Token Cost Estimation (Lean Mode)
 
@@ -34,7 +34,7 @@ Phases: 3 of 7 complete
 | 2 | Local Web Dashboard | 2 | Complete | 2026-03-28 |
 | 3 | Google Sheets Integration | 1 | Not started | - |
 | 4 | Multiplayer + In-Game Config | 1 | Complete | 2026-03-29 |
-| 5 | PDF Export + Polish | 1 | Not started | - |
+| 5 | XLSX Export + Polish | 1 | Complete | 2026-03-29 |
 | 6 | CI/CD Pipeline | 1 | Not started | - |
 | 7 | Prometheus Exporter | 1 | Not started | - |
 

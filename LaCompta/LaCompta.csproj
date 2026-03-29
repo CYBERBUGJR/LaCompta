@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.*" />
+    <PackageReference Include="ClosedXML" Version="0.102.*" />
   </ItemGroup>
 
   <!-- Include web dashboard assets in build output -->
