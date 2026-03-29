@@ -12,9 +12,9 @@ Stardew Valley players can track, visualize, and share their farm's financial pe
 
 | Attribute | Value |
 |-----------|-------|
-| Version | 0.2.0 |
-| Status | Dashboard Complete |
-| Last Updated | 2026-03-28 |
+| Version | 0.4.0 |
+| Status | Multiplayer + Config Complete |
+| Last Updated | 2026-03-29 |
 
 ## Requirements
 
@@ -95,6 +95,10 @@ Stardew Valley players can track, visualize, and share their farm's financial pe
 | Chart.js via CDN | Lightweight, no npm, works in single HTML file | 2026-03-28 | Active |
 | Custom dropdown components | Native `<select>` unstyable for pixel art theme | 2026-03-28 | Active |
 | Standalone Python dev server | Frontend dev without game, separate dev DB | 2026-03-28 | Active |
+| GMCM optional soft dependency | Copy interface, no NuGet, graceful null check | 2026-03-29 | Active |
+| PerScreen<T> for split-screen | Network multiplayer: each machine has own DB | 2026-03-29 | Active |
+| Runtime sprite extraction | /api/sprite/{id} from Game1.objectSpriteSheet, cached | 2026-03-29 | Active |
+| $(GamePath) for deploy | Cross-platform mod deploy via SMAPI property | 2026-03-29 | Active |
 
 ## Tech Stack
 
