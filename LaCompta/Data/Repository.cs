@@ -107,6 +107,33 @@ namespace LaCompta.Data
             return items;
         }
 
+        public List<ItemTransaction> GetAllTransactions(string season = "", int year = 0, int day = 0, string category = "", string playerId = "")
+        {
+            using var conn = _db.GetConnection();
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT *, (total_price - cost_basis) as profit FROM item_transactions
+                WHERE ($season = '' OR season = $season)
+                AND ($year = 0 OR year = $year)
+                AND ($day = 0 OR day = $day)
+                AND ($category = '' OR category = $category)
+                AND ($playerId = '' OR player_id = $playerId)
+                ORDER BY category, item_name, year, season, day";
+            cmd.Parameters.AddWithValue("$season", season);
+            cmd.Parameters.AddWithValue("$year", year);
+            cmd.Parameters.AddWithValue("$day", day);
+            cmd.Parameters.AddWithValue("$category", category);
+            cmd.Parameters.AddWithValue("$playerId", playerId);
+
+            var items = new List<ItemTransaction>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                items.Add(MapItemTransaction(reader));
+            }
+            return items;
+        }
+
         // === Season Summaries ===
 
         public void SaveSeasonSummary(SeasonSummary summary)

@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { icon: '\uD83D\uDCCA', label: 'Overview', hash: 'overview' },
   { icon: '\u2696\uFE0F', label: 'Season Compare', hash: 'comparison' },
   { icon: '\uD83D\uDCB0', label: 'Profitability', hash: 'profitability' },
+  { icon: '\uD83D\uDCCB', label: 'Sales Ledger', hash: 'sales' },
   { icon: '\uD83D\uDC1F', label: 'Legendary Fish', hash: 'legendary' },
 ];
 
@@ -34,9 +35,20 @@ let summaryData = null;
 let sortState = { key: 'profit', desc: true };
 let currentProfitSeason = null;
 let currentProfitYear = null;
+let currentPlayerId = '';
+let players = [];
 
 /* Helpers */
 function gold(n) { return n == null ? '...' : n.toLocaleString() + 'g'; }
+
+function apiUrl(path, params) {
+  var parts = [];
+  if (currentPlayerId) parts.push('playerId=' + encodeURIComponent(currentPlayerId));
+  if (params) {
+    Object.keys(params).forEach(function(k) { parts.push(k + '=' + encodeURIComponent(params[k])); });
+  }
+  return path + (parts.length > 0 ? '?' + parts.join('&') : '');
+}
 
 async function fetchJson(url) {
   try { const r = await fetch(url); if (!r.ok) throw new Error(r.statusText); return await r.json(); }
@@ -139,12 +151,17 @@ document.addEventListener('click', function() {
   document.querySelectorAll('.custom-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
 });
 
-function makeStatCard(label, value, tooltip, valueClass) {
+function makeStatCard(label, value, infoText, valueClass) {
   var card = createEl('div', { className: 'stat-card' });
+  if (infoText) {
+    var infoIcon = createEl('div', { className: 'stat-info-icon', textContent: 'i' });
+    var infoBubble = createEl('div', { className: 'stat-info-bubble', textContent: infoText });
+    infoIcon.appendChild(infoBubble);
+    card.appendChild(infoIcon);
+  }
   card.appendChild(createEl('div', { className: 'label', textContent: label }));
   var valEl = createEl('div', { className: 'value' + (valueClass ? ' ' + valueClass : ''), textContent: value });
   card.appendChild(valEl);
-  if (tooltip) card.appendChild(createEl('div', { className: 'tooltip-text', textContent: tooltip }));
   return card;
 }
 
@@ -303,6 +320,7 @@ function navigate(hash) {
 
 function loadPageData(page) {
   if (page === 'overview') loadOverviewPage();
+  else if (page === 'sales') loadSalesPage();
   else if (page === 'comparison') loadComparisonPage();
   else if (page === 'profitability') loadProfitabilityPage();
   else if (page === 'legendary') loadLegendaryPage();
@@ -321,6 +339,8 @@ document.getElementById('burger-btn').addEventListener('click', function() {
 /* ========== OVERVIEW ========== */
 var overviewRange = 'season';
 
+var stackedAreaEnabled = false;
+
 function setupTimeRangeSelector() {
   document.querySelectorAll('.range-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -330,25 +350,38 @@ function setupTimeRangeSelector() {
       loadOverviewPage();
     });
   });
+
+  var stackToggle = document.getElementById('stacked-area-toggle');
+  if (stackToggle) {
+    stackToggle.addEventListener('change', function() {
+      stackedAreaEnabled = stackToggle.checked;
+      if (charts.overviewTrendLine) {
+        charts.overviewTrendLine.data.datasets.forEach(function(ds) {
+          ds.fill = stackedAreaEnabled;
+        });
+        charts.overviewTrendLine.options.scales.y.stacked = stackedAreaEnabled;
+        charts.overviewTrendLine.update();
+      }
+    });
+  }
 }
 
 function loadOverviewPage() {
-  loadSummaryCards();
-
+  var summaryRow = document.getElementById('summary-cards');
   var seasonTabsEl = document.getElementById('overview-season-tabs');
   var chartsRow = document.querySelector('#page-overview .overview-main-row');
   var alltimePanel = document.getElementById('overview-alltime-panel');
   var seasonTablePanel = document.getElementById('overview-season-table-panel');
 
+  loadSummaryCards();
+
   if (overviewRange === 'alltime') {
-    // Hide season tabs and per-season charts, show all-time charts
     seasonTabsEl.style.display = 'none';
     chartsRow.style.display = 'none';
     alltimePanel.style.display = 'block';
     seasonTablePanel.style.display = 'block';
     loadAlltimeCharts();
   } else if (overviewRange === 'year') {
-    // Show season tabs filtered to years, show per-season charts
     seasonTabsEl.style.display = 'flex';
     chartsRow.style.display = 'grid';
     alltimePanel.style.display = 'none';
@@ -397,9 +430,50 @@ function buildYearTabs(container) {
   loadYearCharts(years[years.length - 1]);
 }
 
-function loadYearCharts(year) {
+async function loadYearCharts(year) {
   var yearSeasons = seasons.filter(function(s) { return s.year === year; });
   if (yearSeasons.length === 0) return;
+  loadSummaryCards(null, year);
+
+  // Fetch daily data for all seasons in this year and build trend chart
+  var results = await Promise.all(yearSeasons.map(function(s) {
+    return fetchJson(apiUrl('/api/daily', { season: s.season, year: s.year })).then(function(data) {
+      return { season: s, data: data };
+    });
+  }));
+  var allDays = [];
+  var allLabels = [];
+  results.forEach(function(r) {
+    if (r.data) {
+      r.data.forEach(function(d) {
+        allDays.push(d);
+        allLabels.push(r.season.season.charAt(0).toUpperCase() + r.season.season.slice(1) + ' D' + d.day);
+      });
+    }
+  });
+  if (allDays.length > 0) {
+    var mkDs = function(lbl, key, col) {
+      return { label: lbl, data: allDays.map(function(d){return d[key];}), borderColor: col.border, backgroundColor: col.bgAlpha, fill: stackedAreaEnabled, tension: 0, pointRadius: 1 };
+    };
+    destroyChart('overviewTrendLine');
+    charts.overviewTrendLine = new Chart(document.getElementById('overview-trend-line'), {
+      type: 'line',
+      data: { labels: allLabels, datasets: [mkDs('Farming','farmingIncome',COLORS.farming), mkDs('Foraging','foragingIncome',COLORS.foraging), mkDs('Fishing','fishingIncome',COLORS.fishing), mkDs('Mining','miningIncome',COLORS.mining), mkDs('Other','otherIncome',COLORS.other)] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { labels: { color: '#a89b6e', font: { family: 'Courier New', size: 11 } } },
+          tooltip: Object.assign({}, tooltipConfig(), { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw.toLocaleString() + 'g'; } } }),
+          zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }
+        },
+        scales: {
+          x: { ticks: { color: '#6b6245', font: { size: 7 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 30 }, grid: { color: 'rgba(139,115,85,0.1)' } },
+          y: { min: 0, stacked: stackedAreaEnabled, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString() + 'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } }
+        }
+      }
+    });
+  }
 
   // Aggregate year data for doughnut
   var totals = { farming: 0, foraging: 0, fishing: 0, mining: 0, other: 0 };
@@ -437,7 +511,7 @@ async function loadAlltimeCharts() {
   var allDays = [];
   var allLabels = [];
   var results = await Promise.all(seasons.map(function(s) {
-    return fetchJson('/api/daily?season=' + s.season + '&year=' + s.year).then(function(data) {
+    return fetchJson(apiUrl('/api/daily', { season: s.season, year: s.year })).then(function(data) {
       return { season: s, data: data };
     });
   }));
@@ -512,40 +586,90 @@ function spawnMoneyParticles(card) {
   }
 }
 
-function loadSummaryCards() {
+var currentViewSeason = null;
+var currentViewYear = null;
+
+function sumSeasonIncome(s) {
+  return s.farmingTotal + s.foragingTotal + s.fishingTotal + s.miningTotal + s.otherTotal;
+}
+
+function loadSummaryCards(season, year) {
+  // Track which season/year the cards reflect
+  if (season !== undefined) currentViewSeason = season;
+  if (year !== undefined) currentViewYear = year;
+
   var container = document.getElementById('summary-cards');
   clearChildren(container);
-  if (!summaryData) {
+  if (!summaryData || seasons.length === 0) {
     showLoading(container);
     return;
   }
-  var net = summaryData.totalIncome - summaryData.totalExpenses;
-  var expenseClass = summaryData.totalExpenses > summaryData.totalIncome ? 'negative' : '';
+
+  var income, expenses, net, contextLabel, infoIncome, infoExpenses, infoNet;
+
+  if (overviewRange === 'alltime') {
+    // All-time view
+    income = seasons.reduce(function(sum, s) { return sum + sumSeasonIncome(s); }, 0);
+    expenses = seasons.reduce(function(sum, s) { return sum + s.totalExpenses; }, 0);
+    contextLabel = 'All Time';
+    infoIncome = 'Total income across all seasons since day 1';
+    infoExpenses = 'Total expenses across all seasons since day 1 (Estimated via daily money delta, net spending only, not gross purchases)';
+    infoNet = 'Income minus expenses across all seasons';
+  } else if (overviewRange === 'year' && currentViewYear) {
+    // Per-year view
+    var yearSeasons = seasons.filter(function(s) { return s.year === currentViewYear; });
+    income = yearSeasons.reduce(function(sum, s) { return sum + sumSeasonIncome(s); }, 0);
+    expenses = yearSeasons.reduce(function(sum, s) { return sum + s.totalExpenses; }, 0);
+    contextLabel = 'Year ' + currentViewYear;
+    infoIncome = 'Total income for year ' + currentViewYear;
+    infoExpenses = 'Expenses for year ' + currentViewYear + ' (Estimated via daily money delta, net spending only, not gross purchases)';
+    infoNet = 'Net profit for year ' + currentViewYear;
+  } else if (currentViewSeason && currentViewYear) {
+    // Per-season view
+    var match = seasons.find(function(s) { return s.season === currentViewSeason && s.year === currentViewYear; });
+    income = match ? sumSeasonIncome(match) : 0;
+    expenses = match ? match.totalExpenses : 0;
+    contextLabel = currentViewSeason.charAt(0).toUpperCase() + currentViewSeason.slice(1) + ' Y' + currentViewYear;
+    infoIncome = 'Income for ' + contextLabel;
+    infoExpenses = 'Expenses for ' + contextLabel + ' (Estimated via daily money delta, net spending only, not gross purchases)';
+    infoNet = 'Net profit for ' + contextLabel;
+  } else {
+    income = summaryData.totalIncome || 0;
+    expenses = summaryData.totalExpenses || 0;
+    contextLabel = 'All Time';
+    infoIncome = 'Total income across all seasons';
+    infoExpenses = 'Total expenses across all seasons (Estimated via daily money delta, net spending only, not gross purchases)';
+    infoNet = 'Income minus expenses';
+  }
+
+  net = income - expenses;
+  var expenseClass = expenses > income ? 'negative' : '';
 
   // Season-over-season differential
   var diffText = '--';
   var diffClass = '';
-  var diffTooltip = 'Need 2+ years of data';
-  if (seasons.length >= 2) {
-    var last = seasons[seasons.length - 1];
-    // Find same season from previous year
-    var prev = seasons.find(function(s) { return s.season === last.season && s.year === last.year - 1; });
+  var diffInfo = 'Need 2+ seasons to compare';
+  if (currentViewSeason && currentViewYear) {
+    var prev = seasons.find(function(s) { return s.season === currentViewSeason && s.year === currentViewYear - 1; });
     if (prev) {
-      var lastTotal = last.farmingTotal + last.foragingTotal + last.fishingTotal + last.miningTotal + last.otherTotal;
-      var prevTotal = prev.farmingTotal + prev.foragingTotal + prev.fishingTotal + prev.miningTotal + prev.otherTotal;
-      var diff = lastTotal - prevTotal;
-      var pct = prevTotal > 0 ? ((diff / prevTotal) * 100).toFixed(1) : '0';
-      diffText = (diff >= 0 ? '+' : '') + gold(diff);
-      diffClass = diff >= 0 ? 'positive' : 'negative';
-      diffTooltip = (diff >= 0 ? '\u25B2 ' : '\u25BC ') + pct + '% vs ' + prev.season + ' Y' + prev.year;
+      var curMatch = seasons.find(function(s) { return s.season === currentViewSeason && s.year === currentViewYear; });
+      if (curMatch) {
+        var curTotal = sumSeasonIncome(curMatch);
+        var prevTotal = sumSeasonIncome(prev);
+        var diff = curTotal - prevTotal;
+        var pct = prevTotal > 0 ? ((diff / prevTotal) * 100).toFixed(1) : '0';
+        diffText = (diff >= 0 ? '+' : '') + gold(diff);
+        diffClass = diff >= 0 ? 'positive' : 'negative';
+        diffInfo = (diff >= 0 ? 'Up ' : 'Down ') + pct + '% vs ' + prev.season + ' Y' + prev.year;
+      }
     }
   }
 
   var cards = [
-    makeStatCard('Total Income', gold(summaryData.totalIncome), null),
-    makeStatCard('Total Expenses', gold(summaryData.totalExpenses), null, expenseClass),
-    makeStatCard('Net Profit', gold(net), null, net >= 0 ? 'positive' : 'negative'),
-    makeStatCard('vs Last Year', diffText, diffTooltip, diffClass)
+    makeStatCard('Income', gold(income), infoIncome),
+    makeStatCard('Expenses', gold(expenses), infoExpenses, expenseClass),
+    makeStatCard('Net Profit', gold(net), infoNet, net >= 0 ? 'positive' : 'negative'),
+    makeStatCard('vs Last Year', diffText, diffInfo, diffClass)
   ];
   cards.forEach(function(card) {
     card.addEventListener('mouseenter', function() { spawnMoneyParticles(card); });
@@ -588,8 +712,13 @@ function applyFilters() {
 
 function renderFilterChips() {
   var container = document.getElementById('filter-chips');
+  var section = document.getElementById('filter-section');
   clearChildren(container);
-  if (activeFilters.length === 0) return;
+  if (activeFilters.length === 0) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = 'block';
 
   activeFilters.forEach(function(idx) {
     var chip = createEl('div', { className: 'filter-chip ' + CAT_LABELS[idx] });
@@ -663,35 +792,34 @@ function updateBarForFilters() {
 }
 
 function updateSummaryForFilters() {
+  if (!isFilterActive()) {
+    // Rebuild cards with full context data
+    loadSummaryCards(currentViewSeason, currentViewYear);
+    return;
+  }
+
+  // When filters active, update income card to show filtered total from current season
   var container = document.getElementById('summary-cards');
-  if (!container || !summaryData) return;
+  if (!container || !cachedOverviewSummary) return;
 
   var incomeEl = container.querySelector('.stat-card:nth-child(1) .value');
   var expenseEl = container.querySelector('.stat-card:nth-child(2) .value');
   var netEl = container.querySelector('.stat-card:nth-child(3) .value');
   if (!incomeEl || !expenseEl || !netEl) return;
 
-  if (!isFilterActive()) {
-    incomeEl.textContent = gold(summaryData.totalIncome);
-    expenseEl.textContent = gold(summaryData.totalExpenses);
-    var net = summaryData.totalIncome - summaryData.totalExpenses;
-    netEl.textContent = gold(net);
-    netEl.className = 'value ' + (net >= 0 ? 'positive' : 'negative');
-    expenseEl.className = 'value ' + (summaryData.totalExpenses > summaryData.totalIncome ? 'negative' : '');
-  } else {
-    var catKeys = ['farming', 'foraging', 'fishing', 'mining', 'other'];
-    var filteredIncome = 0;
-    var filterNames = [];
-    activeFilters.forEach(function(idx) {
-      filteredIncome += summaryData.categories ? (summaryData.categories[catKeys[idx]] || 0) : 0;
-      filterNames.push(CAT_LABELS[idx]);
-    });
-    incomeEl.textContent = gold(filteredIncome) + ' (' + filterNames.join('+') + ')';
-    expenseEl.textContent = 'N/A';
-    expenseEl.className = 'value';
-    netEl.textContent = 'N/A';
-    netEl.className = 'value';
-  }
+  var catTotals = [
+    cachedOverviewSummary.farmingTotal, cachedOverviewSummary.foragingTotal,
+    cachedOverviewSummary.fishingTotal, cachedOverviewSummary.miningTotal,
+    cachedOverviewSummary.otherTotal
+  ];
+  var filteredIncome = 0;
+  activeFilters.forEach(function(idx) { filteredIncome += catTotals[idx] || 0; });
+
+  incomeEl.textContent = gold(filteredIncome);
+  expenseEl.textContent = 'N/A';
+  expenseEl.className = 'value';
+  netEl.textContent = 'N/A';
+  netEl.className = 'value';
 }
 
 function handleChartClick(evt, elements, chart) {
@@ -706,14 +834,15 @@ async function loadOverviewCharts(season, year) {
   cachedOverviewSummary = summary;
   activeFilters = [];
   renderFilterChips();
+  loadSummaryCards(season, year);
   var values = [summary.farmingTotal, summary.foragingTotal, summary.fishingTotal, summary.miningTotal, summary.otherTotal];
 
   /* Main trend line chart */
-  var dailyData = await fetchJson('/api/daily?season=' + season + '&year=' + year);
+  var dailyData = await fetchJson(apiUrl('/api/daily', { season: season, year: year }));
   if (dailyData && dailyData.length > 0) {
     var labels = dailyData.map(function(d) { return 'Day ' + d.day; });
     var mkDs = function(lbl, key, col) {
-      return { label: lbl, data: dailyData.map(function(d){return d[key];}), borderColor: col.border, backgroundColor: col.bgAlpha, fill: false, tension: 0, pointRadius: 2 };
+      return { label: lbl, data: dailyData.map(function(d){return d[key];}), borderColor: col.border, backgroundColor: col.bgAlpha, fill: stackedAreaEnabled, tension: 0, pointRadius: 2 };
     };
     destroyChart('overviewTrendLine');
     charts.overviewTrendLine = new Chart(document.getElementById('overview-trend-line'), {
@@ -751,7 +880,7 @@ async function loadOverviewCharts(season, year) {
             min: Math.max(0, labels.length - 14),
             max: labels.length - 1
           },
-          y: { min: 0, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString()+'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } }
+          y: { min: 0, stacked: stackedAreaEnabled, ticks: { color: '#6b6245', callback: function(v){return v.toLocaleString()+'g';} }, grid: { color: 'rgba(139,115,85,0.1)' } }
         }
       }
     });
@@ -813,6 +942,136 @@ function rotateTags() {
     el.style.opacity = '0';
     setTimeout(function() { el.textContent = TAGLINES[i]; el.style.opacity = '1'; }, 400);
   }, 5000);
+}
+
+/* ========== SALES LEDGER ========== */
+var salesCurrentSeason = null;
+var salesCurrentYear = null;
+var salesCurrentDay = 0; // 0 = all days
+
+function loadSalesPage() {
+  var lastSeason = seasons.length > 0 ? seasons[seasons.length - 1] : null;
+  buildSeasonTabs(
+    document.getElementById('sales-season-tabs'),
+    lastSeason ? lastSeason.season : null,
+    lastSeason ? lastSeason.year : null,
+    function(season, year) {
+      salesCurrentSeason = season;
+      salesCurrentYear = year;
+      salesCurrentDay = 0;
+      buildDaySelector(season, year);
+      loadSalesData(season, year, 0);
+    }
+  );
+}
+
+function buildDaySelector(season, year) {
+  var container = document.getElementById('sales-day-selector');
+  clearChildren(container);
+
+  container.appendChild(createEl('span', { className: 'day-label', textContent: 'Day:' }));
+
+  // "All" button
+  var allBtn = createEl('div', { className: 'day-btn active', textContent: 'All' });
+  allBtn.addEventListener('click', function() {
+    container.querySelectorAll('.day-btn').forEach(function(b) { b.classList.remove('active'); });
+    allBtn.classList.add('active');
+    salesCurrentDay = 0;
+    loadSalesData(salesCurrentSeason, salesCurrentYear, 0);
+  });
+  container.appendChild(allBtn);
+
+  // Day 1-28 buttons
+  for (var d = 1; d <= 28; d++) {
+    (function(day) {
+      var btn = createEl('div', { className: 'day-btn', textContent: String(day) });
+      btn.addEventListener('click', function() {
+        container.querySelectorAll('.day-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        salesCurrentDay = day;
+        loadSalesData(salesCurrentSeason, salesCurrentYear, day);
+      });
+      container.appendChild(btn);
+    })(d);
+  }
+}
+
+async function loadSalesData(season, year, day) {
+  var params = { season: season, year: year };
+  if (day > 0) params.day = day;
+  var data = await fetchJson(apiUrl('/api/transactions', params));
+  var container = document.getElementById('sales-table-body');
+  clearChildren(container);
+
+  if (!data || !data.length) {
+    var tr = createEl('tr');
+    var td = createEl('td', { colspan: '7' });
+    showEmpty(td, '\uD83D\uDCCB', 'Nothing sold yet... the shipping bin misses you');
+    tr.appendChild(td);
+    container.appendChild(tr);
+    return;
+  }
+
+  // Group by category
+  var grouped = {};
+  CAT_LABELS.forEach(function(cat) { grouped[cat] = []; });
+  data.forEach(function(tx) {
+    var cat = grouped[tx.category] ? tx.category : 'Other';
+    grouped[cat].push(tx);
+  });
+
+  // Aggregate by item within each category
+  CAT_LABELS.forEach(function(cat) {
+    var items = grouped[cat];
+    if (items.length === 0) return;
+
+    // Aggregate same items
+    var byItem = {};
+    items.forEach(function(tx) {
+      if (!byItem[tx.itemName]) {
+        byItem[tx.itemName] = { itemName: tx.itemName, itemId: tx.itemId, category: cat, quantity: 0, totalPrice: 0, costBasis: 0, count: 0 };
+      }
+      byItem[tx.itemName].quantity += tx.quantity;
+      byItem[tx.itemName].totalPrice += tx.totalPrice;
+      byItem[tx.itemName].costBasis += tx.costBasis;
+      byItem[tx.itemName].count++;
+    });
+
+    var aggregated = Object.values(byItem);
+    aggregated.sort(function(a, b) { return b.totalPrice - a.totalPrice; });
+
+    // Category header row
+    var catTotal = aggregated.reduce(function(s, i) { return s + i.totalPrice; }, 0);
+    var headerTr = createEl('tr', { className: 'sales-cat-header' });
+    var headerTd = createEl('td', { colspan: '7' });
+    headerTd.appendChild(createEl('span', { className: 'cat-badge ' + cat, textContent: cat }));
+    headerTd.appendChild(createEl('span', { className: 'sales-cat-total', textContent: '  ' + catTotal.toLocaleString() + 'g total' }));
+    headerTr.appendChild(headerTd);
+    container.appendChild(headerTr);
+
+    // Item rows
+    aggregated.forEach(function(item) {
+      var profit = item.totalPrice - item.costBasis;
+      var avgPrice = item.quantity > 0 ? Math.round(item.totalPrice / item.quantity) : 0;
+      var tr = createEl('tr');
+      var nameTd = createEl('td', { className: 'item-name-cell' });
+      var sprite = createEl('img', { className: 'item-sprite', src: '/api/sprite/' + item.itemId, alt: '' });
+      sprite.onerror = function() { this.style.display = 'none'; };
+      nameTd.appendChild(sprite);
+      nameTd.appendChild(document.createTextNode(item.itemName));
+      tr.appendChild(nameTd);
+      tr.appendChild(createEl('td'));  // category column empty (shown in header)
+      tr.appendChild(createEl('td', { textContent: String(item.quantity) }));
+      tr.appendChild(createEl('td', { textContent: avgPrice.toLocaleString() + 'g' }));
+      tr.appendChild(createEl('td', { textContent: item.totalPrice.toLocaleString() + 'g' }));
+      tr.appendChild(createEl('td', { textContent: item.costBasis.toLocaleString() + 'g' }));
+      tr.appendChild(createEl('td', {
+        className: profit >= 0 ? 'profit-positive' : 'profit-negative',
+        textContent: (profit >= 0 ? '+' : '') + profit.toLocaleString() + 'g'
+      }));
+      container.appendChild(tr);
+    });
+  });
 }
 
 /* ========== COMPARISON ========== */
@@ -1007,7 +1266,7 @@ function loadProfitabilityPage() {
 }
 
 async function loadProfitTable(season, year) {
-  var data = await fetchJson('/api/profitability?season=' + season + '&year=' + year + '&limit=50');
+  var data = await fetchJson(apiUrl('/api/profitability', { season: season, year: year, limit: 50 }));
   var tbody = document.getElementById('profit-tbody');
   clearChildren(tbody);
 
@@ -1055,7 +1314,7 @@ async function loadProfitTable(season, year) {
 async function loadLegendaryPage() {
   var grid = document.getElementById('fish-grid');
   showLoading(grid);
-  var data = await fetchJson('/api/fish');
+  var data = await fetchJson(apiUrl('/api/fish'));
   clearChildren(grid);
 
   if (!data || !data.length) {
@@ -1088,20 +1347,67 @@ async function loadLegendaryPage() {
   });
 }
 
+/* ========== PLAYER SELECTOR ========== */
+function buildPlayerSelector(playerList) {
+  var container = document.getElementById('player-selector');
+  if (!container) return;
+
+  var opts = playerList.map(function(p) {
+    var label = p.name + (p.isCurrentPlayer ? ' (you)' : '');
+    return { value: p.playerId, label: label };
+  });
+
+  var dd = makeCustomDropdown(opts, currentPlayerId, function(val) {
+    currentPlayerId = val;
+    reloadAllData();
+  });
+
+  container.style.display = 'block';
+  clearChildren(container);
+  container.appendChild(createEl('span', { className: 'label', textContent: 'Player: ' }));
+  container.appendChild(dd.el);
+}
+
+async function reloadAllData() {
+  var initData = await Promise.all([
+    fetchJson(apiUrl('/api/summary')),
+    fetchJson(apiUrl('/api/seasons'))
+  ]);
+  summaryData = initData[0];
+  seasons = initData[1] || [];
+  navigate(window.location.hash);
+}
+
 /* ========== INIT ========== */
 async function init() {
   setupTimeRangeSelector();
   buildNav();
   rotateTags();
 
-  var initData = await Promise.all([
-    fetchJson('/api/summary'),
-    fetchJson('/api/seasons'),
-    fetchJson('/api/farminfo')
+  // Get player info first, then load data with correct playerId
+  var metaData = await Promise.all([
+    fetchJson('/api/farminfo'),
+    fetchJson('/api/players')
   ]);
-  summaryData = initData[0];
-  seasons = initData[1] || [];
-  var farmInfo = initData[2];
+  var farmInfo = metaData[0];
+  players = metaData[1] || [];
+
+  if (farmInfo && farmInfo.playerId) {
+    currentPlayerId = farmInfo.playerId;
+  }
+
+  // Show player selector if multiplayer
+  if (players.length > 1) {
+    buildPlayerSelector(players);
+  }
+
+  // Now load data with correct playerId filter
+  var gameData = await Promise.all([
+    fetchJson(apiUrl('/api/summary')),
+    fetchJson(apiUrl('/api/seasons'))
+  ]);
+  summaryData = gameData[0];
+  seasons = gameData[1] || [];
   if (farmInfo && farmInfo.farmName) {
     document.getElementById('farm-name').textContent = farmInfo.farmName + ' Farm — ' + farmInfo.playerName;
   }

@@ -150,15 +150,24 @@ def seed_database(db_path):
         ("fall",3,"Ancient Fruit Wine","348","Farming",150,1650,0), ("fall",3,"Truffle Oil","432","Farming",60,1065,0),
         ("winter",3,"Ancient Fruit Wine","348","Farming",180,1650,0), ("winter",3,"Diamond","72","Mining",35,750,0),
     ]
-    for item in items:
+    for idx, item in enumerate(items):
         season, year, name, iid, cat, qty, price, cost = item
-        c.execute("SELECT id FROM daily_records WHERE season=? AND year=? AND day=14 AND player_id=?", (season, year, PID))
+        # Spread transactions across days 3-26 for variety
+        day = 3 + (idx * 7) % 24
+        c.execute("SELECT id FROM daily_records WHERE season=? AND year=? AND day=? AND player_id=?", (season, year, day, PID))
         row = c.fetchone()
         rid = row[0] if row else 1
-        c.execute("""INSERT INTO item_transactions
-            (daily_record_id, item_name, item_id, category, quantity, unit_price, total_price, cost_basis, season, year, day, player_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (rid, name, iid, cat, qty, price, qty * price, qty * cost, season, year, 14, PID))
+        # Split quantity across multiple days for more realistic data
+        for d_offset in [0, 5, 12, 19]:
+            sub_day = ((day + d_offset - 1) % 28) + 1
+            sub_qty = max(1, qty // 4)
+            c.execute("SELECT id FROM daily_records WHERE season=? AND year=? AND day=? AND player_id=?", (season, year, sub_day, PID))
+            dr = c.fetchone()
+            dr_id = dr[0] if dr else rid
+            c.execute("""INSERT INTO item_transactions
+                (daily_record_id, item_name, item_id, category, quantity, unit_price, total_price, cost_basis, season, year, day, player_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (dr_id, name, iid, cat, sub_qty, price, sub_qty * price, sub_qty * cost, season, year, sub_day, PID))
 
     # Fish records
     fish = [
@@ -294,10 +303,51 @@ def api_farminfo():
     return {
         "farmName": "Dev Farm",
         "playerName": "Dev Player",
+        "playerId": "player1",
         "season": "winter",
         "year": 3,
-        "day": 28
+        "day": 28,
+        "isMultiplayer": False
     }
+
+
+def api_transactions(params):
+    season = params.get("season", [""])[0]
+    year = int(params.get("year", ["0"])[0])
+    day = int(params.get("day", ["0"])[0])
+    category = params.get("category", [""])[0]
+    player_id = params.get("playerId", [""])[0]
+    db = get_db()
+    c = db.cursor()
+    where = []
+    args = []
+    if season:
+        where.append("season=?")
+        args.append(season)
+    if year:
+        where.append("year=?")
+        args.append(year)
+    if day:
+        where.append("day=?")
+        args.append(day)
+    if category:
+        where.append("category=?")
+        args.append(category)
+    if player_id:
+        where.append("player_id=?")
+        args.append(player_id)
+    sql = "SELECT id, daily_record_id as dailyRecordId, item_name as itemName, item_id as itemId, category, quantity, unit_price as unitPrice, total_price as totalPrice, cost_basis as costBasis, season, year, day, player_id as playerId FROM item_transactions"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY category, item_name, year, day"
+    c.execute(sql, args)
+    return rows_to_dicts(c, c.fetchall())
+
+
+def api_players(params=None):
+    return [
+        {"playerId": "player1", "name": "Dev Player", "isCurrentPlayer": True}
+    ]
 
 
 # ─── HTTP Server ───
@@ -309,6 +359,8 @@ ROUTES = {
     "/api/fish/legendary": api_fish_legendary,
     "/api/fish": api_fish,
     "/api/summary": api_summary,
+    "/api/players": api_players,
+    "/api/transactions": api_transactions,
 }
 
 MIME_TYPES = {

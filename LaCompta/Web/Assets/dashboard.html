@@ -35,6 +35,7 @@
       <div class="header">
         <h1><img src="/favicon.png" alt="" class="title-logo"> La Compta</h1>
         <div class="farm-name" id="farm-name"></div>
+        <div class="player-selector" id="player-selector" style="display:none;"></div>
         <div class="tagline" id="tagline"></div>
       </div>
       <div class="summary-row" id="summary-cards"></div>
@@ -49,7 +50,14 @@
                 <button class="range-btn" data-range="alltime">All Time</button>
               </div>
               <div class="season-tabs" id="overview-season-tabs"></div>
-              <div class="filter-chips" id="filter-chips"></div>
+              <label class="toggle-option">
+                <input type="checkbox" id="stacked-area-toggle">
+                <span class="toggle-label">Stacked area</span>
+              </label>
+              <div class="filter-section" id="filter-section" style="display:none;">
+                <div class="filter-section-title">Filters</div>
+                <div class="filter-chips" id="filter-chips"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -91,6 +99,32 @@
           </div>
         </div>
       </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sales Ledger page -->
+    <div class="page" id="page-sales">
+      <div class="page-title">Sales Ledger</div>
+      <div class="season-tabs" id="sales-season-tabs"></div>
+      <div class="sales-day-selector" id="sales-day-selector"></div>
+      <div class="panel">
+        <div class="panel-title">Items Sold by Category</div>
+        <div class="panel-body">
+          <div class="table-wrapper">
+            <table id="sales-table">
+              <thead><tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Qty</th>
+                <th>Avg Price</th>
+                <th>Revenue</th>
+                <th>Cost</th>
+                <th>Profit</th>
+              </tr></thead>
+              <tbody id="sales-table-body"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
