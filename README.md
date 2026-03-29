@@ -4,6 +4,10 @@
 
 <h1 align="center">LaCompta</h1>
 
+<p align="center">
+  <a href="https://github.com/CYBERBUGJR/LaCompta/actions/workflows/build.yml"><img src="https://github.com/CYBERBUGJR/LaCompta/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+</p>
+
 <p align="center"><em>"Salut salut, c'est Valérie de la compta, ouais, ouais, super écoute, je t'appelle par rapport aux poireaux que tu as oublié de déclarer à l'URSSAF"</em></p>
 
 A SMAPI mod for Stardew Valley that tracks your farm's financial performance across seasons. Because every gold coin counts.
@@ -24,28 +28,76 @@ A SMAPI mod for Stardew Valley that tracks your farm's financial performance acr
 - Item sprites from the game's spritesheet in Sales Ledger
 - Google Sheets integration — sync your stats to the cloud (coming soon)
 
-## Installation
-
-1. Install [SMAPI](https://smapi.io/) (4.x+)
-2. Download the latest release from the [Releases page](https://github.com/bcalvet/LaCompta/releases)
-3. Extract the zip into your `Stardew Valley/Mods/` folder
-4. Launch the game through SMAPI
-
 ## Requirements
 
-- Stardew Valley 1.6.15+
-- SMAPI 4.0+
+- [Stardew Valley](https://store.steampowered.com/app/413150/Stardew_Valley/) 1.6.15+
+- [SMAPI](https://smapi.io/) 4.0+ (the modding framework)
+- Optional: [Generic Mod Config Menu](https://www.nexusmods.com/stardewvalley/mods/5098) for in-game settings
+
+## Installation (from release)
+
+1. Install [SMAPI](https://smapi.io/) if you haven't already
+2. Download the latest `LaCompta-x.x.x.zip` from the [Releases page](https://github.com/CYBERBUGJR/LaCompta/releases)
+3. Extract the zip into your Stardew Valley `Mods/` folder:
+   - **Windows:** `C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods\`
+   - **Linux:** `~/.local/share/Steam/steamapps/common/Stardew Valley/Mods/`
+   - **macOS:** `~/Library/Application Support/Steam/steamapps/common/Stardew Valley/Mods/`
+4. Launch the game through SMAPI
+5. Open the dashboard: type `lacompta_open` in the SMAPI console, or visit http://localhost:5555/
+
+Your folder structure should look like:
+```
+Stardew Valley/
+  Mods/
+    LaCompta/
+      LaCompta.dll
+      manifest.json
+      Assets/
+        dashboard.html
+        style.css
+        app.js
+        ...
+      ClosedXML.dll
+      Microsoft.Data.Sqlite.dll
+      ...
+```
 
 ## Building from Source
 
+### Prerequisites
+
+- [.NET 6 SDK](https://dotnet.microsoft.com/download/dotnet/6.0)
+- [Stardew Valley](https://store.steampowered.com/app/413150/Stardew_Valley/) installed (for game references)
+- [SMAPI](https://smapi.io/) installed in the game folder
+
+### Build & deploy
+
 ```bash
-# Prerequisites: .NET 6 SDK, SMAPI installed
+git clone https://github.com/CYBERBUGJR/LaCompta.git
+cd LaCompta
 dotnet restore
 dotnet build
-# Mod auto-deploys to your Mods/ folder
 ```
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for full dev setup.
+The mod auto-deploys to your `Stardew Valley/Mods/LaCompta/` folder via SMAPI's ModBuildConfig.
+
+### Frontend development (no game needed)
+
+```bash
+python3 scripts/dev-server.py
+# Dashboard at http://localhost:5555/ with 3 years of mock data
+```
+
+### SMAPI console commands
+
+| Command | Description |
+|---------|-------------|
+| `lacompta_open` | Open the web dashboard in your browser |
+| `lacompta_export` | Export an Excel (.xlsx) report to the mod folder |
+| `lacompta_test` | Run integration tests |
+| `lacompta_status` | Show tracked seasons and stats |
+
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for full dev setup and PR guidelines.
 
 ## Documentation
 

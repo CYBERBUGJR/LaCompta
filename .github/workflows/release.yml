@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Setup SMAPI build environment
+        run: |
+          mkdir -p "/tmp/stardew/Stardew Valley/smapi-internal"
+          wget -q "https://github.com/Pathoschild/SMAPI/releases/download/4.5.2/SMAPI-4.5.2-installer.zip" -O /tmp/smapi.zip
+          unzip -q /tmp/smapi.zip -d /tmp/smapi-extract
+          find /tmp/smapi-extract -name "*.dll" -exec cp {} "/tmp/stardew/Stardew Valley/smapi-internal/" \; 2>/dev/null || true
+
+      - name: Restore
+        run: dotnet restore LaCompta/LaCompta.csproj
+        env:
+          GamePath: /tmp/stardew/Stardew Valley
+
+      - name: Build Release
+        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore
+        env:
+          GamePath: /tmp/stardew/Stardew Valley
+
+      - name: Package mod
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${REF_NAME#v}"
+          MOD_DIR="release/LaCompta"
+          mkdir -p "$MOD_DIR/Assets"
+
+          cp LaCompta/bin/Release/net6.0/LaCompta.dll "$MOD_DIR/"
+          cp LaCompta/manifest.json "$MOD_DIR/"
+
+          for dll in LaCompta/bin/Release/net6.0/*.dll; do
+            name=$(basename "$dll")
+            case "$name" in
+              LaCompta.dll|StardewValley*|SMAPI*|MonoGame*|xna*) continue ;;
+              *) cp "$dll" "$MOD_DIR/" ;;
+            esac
+          done
+
+          cp -r LaCompta/bin/Release/net6.0/Web/Assets/* "$MOD_DIR/Assets/" 2>/dev/null || true
+          cp LaCompta/bin/Release/net6.0/libe_sqlite3.so "$MOD_DIR/" 2>/dev/null || true
+
+          cd release
+          zip -r "../LaCompta-${VERSION}.zip" LaCompta/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LaCompta-*.zip
+          generate_release_notes: true
