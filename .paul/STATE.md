@@ -5,25 +5,25 @@
 See: .paul/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Track, visualize, and share farm financial performance across seasons.
-**Current focus:** Phase 3 — Google Sheets Integration
+**Current focus:** Phase 4 — Multiplayer + In-Game Config
 
 ## Current Position
 
 Milestone: v0.1 Initial Release (v0.1.0)
-Phase: 3 of 7 (Google Sheets Integration) — Not started
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-28 — Phase 2 complete, transitioned to Phase 3
+Phase: 4 of 7 (Multiplayer + In-Game Config) — Planning
+Plan: 04-01 created, awaiting approval
+Status: PLAN created, ready for APPLY
+Last activity: 2026-03-28 — Created 04-01-PLAN.md
 
 Progress:
 - Milestone: [████░░░░░░] 40%
-- Phase 2: [██████████] 100%
+- Phase 4: [░░░░░░░░░░] 0%
 
 ## Loop Position
 
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Idle — ready for next PLAN]
+  ✓        ○        ○     [Plan created, awaiting approval]
 ```
 
 ## Performance Metrics
@@ -36,31 +36,26 @@ PLAN ──▶ APPLY ──▶ UNIFY
 ## Accumulated Context
 
 ### Decisions
-- HttpListener on port 5555, background thread
-- camelCase JSON, System.Text.Json
-- Chart.js via CDN (no build step)
-- Vanilla JS only (no React/Vue)
-- Single-file SPA with hash routing
-- Custom dropdown components for styled selects
-- Standalone Python dev server for frontend iteration
-- Multi-filter system across charts
+- Phase 3 (Google Sheets) deferred — code on phase/03-google-sheets branch
+- GMCM is optional soft dependency (no NuGet, copy interface)
+- PerScreen<T> for split-screen, regular fields for network multiplayer
+- Single web server for all screens, filter by playerId
+- No multiplayer message passing needed (each machine has own DB)
 
 ### Deferred Issues
+- Google Sheets verification pending
 - Expense tracking is basic (money delta only)
-- Native lib copy needs per-OS handling in CI/CD
-- Fish sprites from spriters-resource blocked by 403
+- ProfitabilityCalculator stale cache across save reloads
 
 ### Git State
-Last commit: c00060f (phase/02-dashboard branch, pending commit)
-Branch: phase/02-dashboard
-Feature branches merged: none yet
+Branch: phase/04-multiplayer-config (from phase/02-dashboard)
 
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Phase 2 complete, ready to plan Phase 3
-Next action: Commit Phase 2, then /paul:plan for Phase 3
-Resume file: .paul/ROADMAP.md
+Stopped at: Plan 04-01 created
+Next action: Approve plan, then /paul:apply
+Resume file: .paul/phases/04-multiplayer-config/04-01-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*

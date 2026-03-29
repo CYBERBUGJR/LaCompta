@@ -2,26 +2,33 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using LaCompta.Data;
+using LaCompta.Integrations;
+using LaCompta.Models;
 using LaCompta.Services;
 using LaCompta.Web;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 
 namespace LaCompta
 {
     internal sealed class ModEntry : Mod
     {
+        private ModConfig Config;
         private DatabaseContext _db = null!;
         private Repository _repo = null!;
-        private TrackingService _tracker = null!;
-        private SeasonSummaryService _seasonSummary = null!;
+        private readonly PerScreen<TrackingService> _tracker = new();
+        private readonly PerScreen<SeasonSummaryService> _seasonSummary = new();
         private WebServer _webServer = null!;
 
         public override void Entry(IModHelper helper)
         {
+            this.Config = helper.ReadConfig<ModConfig>();
+
             this.Monitor.Log("LaCompta loaded bitch ! Time to count those coins!", LogLevel.Info);
 
+            helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
             helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += this.OnDayStarted;
             helper.Events.GameLoop.DayEnding += this.OnDayEnding;
@@ -33,24 +40,75 @@ namespace LaCompta
             helper.ConsoleCommands.Add("lacompta_open", "Open LaCompta dashboard in browser", this.OpenDashboard);
         }
 
+        private void OnGameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+            var gmcm = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (gmcm is null)
+            {
+                this.Monitor.Log("GMCM not installed -- config via config.json only.", LogLevel.Debug);
+                return;
+            }
+
+            gmcm.Register(
+                mod: this.ModManifest,
+                reset: () => { this.Config = new ModConfig(); this.Helper.WriteConfig(this.Config); },
+                save: () => this.Helper.WriteConfig(this.Config)
+            );
+
+            gmcm.AddSectionTitle(
+                mod: this.ModManifest,
+                text: () => "Dashboard"
+            );
+
+            gmcm.AddBoolOption(
+                mod: this.ModManifest,
+                getValue: () => this.Config.AutoOpenDashboard,
+                setValue: value => this.Config.AutoOpenDashboard = value,
+                name: () => "Auto-open on save load",
+                tooltip: () => "Automatically open the web dashboard when a save is loaded"
+            );
+
+            gmcm.AddTextOption(
+                mod: this.ModManifest,
+                getValue: () => this.Config.WebServerPort.ToString(),
+                setValue: value => {
+                    if (int.TryParse(value, out var port) && port >= 1024 && port <= 65535)
+                        this.Config.WebServerPort = port;
+                },
+                name: () => "Web server port",
+                tooltip: () => "Port for the dashboard web server (1024-65535, requires restart)"
+            );
+
+            gmcm.AddParagraph(
+                mod: this.ModManifest,
+                text: () => "Run 'lacompta_open' in SMAPI console to open the dashboard in your browser."
+            );
+        }
+
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            // Initialize database in mod's data folder
+            // Initialize database (shared across screens)
             var dataPath = this.Helper.DirectoryPath;
             _db = new DatabaseContext(dataPath);
             _repo = new Repository(_db);
-            _tracker = new TrackingService(_repo, this.Monitor);
-            _seasonSummary = new SeasonSummaryService(_repo, this.Monitor);
+
+            // Per-screen services for split-screen multiplayer
+            _tracker.Value = new TrackingService(_repo, this.Monitor);
+            _seasonSummary.Value = new SeasonSummaryService(_repo, this.Monitor);
 
             // Stop existing web server if reloading a save without returning to title
             _webServer?.Stop();
 
-            // Start web server
+            // Start web server on configured port
             var api = new ApiController(_repo, this.Monitor, this.Helper.DirectoryPath);
-            _webServer = new WebServer(api, this.Monitor);
+            _webServer = new WebServer(api, this.Monitor, this.Config.WebServerPort);
             _webServer.Start();
 
             this.Monitor.Log($"LaCompta initialized for {Game1.player.Name}'s farm. Let the accounting begin!", LogLevel.Info);
+
+            // Auto-open dashboard if configured
+            if (this.Config.AutoOpenDashboard)
+                OpenDashboard("lacompta_open", System.Array.Empty<string>());
         }
 
         private void OnReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
@@ -60,7 +118,7 @@ namespace LaCompta
 
         private void OpenDashboard(string command, string[] args)
         {
-            var url = "http://localhost:5555";
+            var url = $"http://localhost:{this.Config.WebServerPort}";
             try
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -80,19 +138,16 @@ namespace LaCompta
 
         private void OnDayStarted(object sender, DayStartedEventArgs e)
         {
-            _tracker?.OnDayStarted();
+            _tracker.Value?.OnDayStarted();
         }
 
         private void OnDayEnding(object sender, DayEndingEventArgs e)
         {
-            if (_tracker == null)
+            if (_tracker.Value == null)
                 return;
 
-            // Track daily income/expenses first
-            _tracker.OnDayEnding();
-
-            // Then generate season summary if it's end of season
-            _seasonSummary.OnDayEnding();
+            _tracker.Value.OnDayEnding();
+            _seasonSummary.Value?.OnDayEnding();
         }
 
         /// <summary>
@@ -107,7 +162,7 @@ namespace LaCompta
                 return;
             }
 
-            if (_tracker == null)
+            if (_tracker.Value == null)
             {
                 this.Monitor.Log("LaCompta not initialized. Load a save first!", LogLevel.Warn);
                 return;
@@ -127,8 +182,8 @@ namespace LaCompta
                 bin.Add(parsnip);
 
                 // Snapshot money, then process
-                _tracker.OnDayStarted();
-                _tracker.OnDayEnding();
+                _tracker.Value.OnDayStarted();
+                _tracker.Value.OnDayEnding();
 
                 var records = _repo.GetDailyRecords(Game1.currentSeason, Game1.year, Game1.player.UniqueMultiplayerID.ToString());
                 var today = records.FirstOrDefault(r => r.Day == Game1.dayOfMonth);
@@ -155,8 +210,8 @@ namespace LaCompta
                 var fish = ItemRegistry.Create("(O)136", 2);
                 bin.Add(fish);
 
-                _tracker.OnDayStarted();
-                _tracker.OnDayEnding();
+                _tracker.Value.OnDayStarted();
+                _tracker.Value.OnDayEnding();
 
                 var records = _repo.GetDailyRecords(Game1.currentSeason, Game1.year, Game1.player.UniqueMultiplayerID.ToString());
                 var today = records.FirstOrDefault(r => r.Day == Game1.dayOfMonth);
@@ -183,8 +238,8 @@ namespace LaCompta
                 var diamond = ItemRegistry.Create("(O)72", 1);
                 bin.Add(diamond);
 
-                _tracker.OnDayStarted();
-                _tracker.OnDayEnding();
+                _tracker.Value.OnDayStarted();
+                _tracker.Value.OnDayEnding();
 
                 var records = _repo.GetDailyRecords(Game1.currentSeason, Game1.year, Game1.player.UniqueMultiplayerID.ToString());
                 var today = records.FirstOrDefault(r => r.Day == Game1.dayOfMonth);
@@ -211,8 +266,8 @@ namespace LaCompta
                 var legend = ItemRegistry.Create("(O)163", 1);
                 bin.Add(legend);
 
-                _tracker.OnDayStarted();
-                _tracker.OnDayEnding();
+                _tracker.Value.OnDayStarted();
+                _tracker.Value.OnDayEnding();
 
                 var legendaryFish = _repo.GetLegendaryFish(Game1.player.UniqueMultiplayerID.ToString());
                 if (legendaryFish.Any(f => f.FishId == "163"))
@@ -231,10 +286,10 @@ namespace LaCompta
 
             // Test 5: Expense tracking
             {
-                _tracker.OnDayStarted();
+                _tracker.Value.OnDayStarted();
                 int moneyBefore = Game1.player.Money;
                 Game1.player.Money -= 500; // simulate a purchase
-                _tracker.OnDayEnding();
+                _tracker.Value.OnDayEnding();
 
                 var records = _repo.GetDailyRecords(Game1.currentSeason, Game1.year, Game1.player.UniqueMultiplayerID.ToString());
                 var today = records.FirstOrDefault(r => r.Day == Game1.dayOfMonth);

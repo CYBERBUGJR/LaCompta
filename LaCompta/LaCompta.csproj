@@ -23,7 +23,7 @@
       <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/linux-x64/native/libe_sqlite3.so</NativeSqliteSrc>
       <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/osx-x64/native/libe_sqlite3.dylib</NativeSqliteSrc>
       <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/win-x64/native/e_sqlite3.dll</NativeSqliteSrc>
-      <GameModsDir>$([System.IO.Path]::Combine($(HOME), '.steam', 'steam', 'steamapps', 'common', 'Stardew Valley', 'Mods', 'LaCompta'))</GameModsDir>
+      <GameModsDir>$(GamePath)/Mods/LaCompta</GameModsDir>
     </PropertyGroup>
     <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(TargetDir)" Condition="Exists('$(NativeSqliteSrc)')" />
     <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(GameModsDir)" Condition="Exists('$(NativeSqliteSrc)') And Exists('$(GameModsDir)')" />

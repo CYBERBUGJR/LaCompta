@@ -33,7 +33,7 @@ Phases: 2 of 7 complete
 | 1 | Scaffolding + Core Engine | 2 | Complete | 2026-03-28 |
 | 2 | Local Web Dashboard | 2 | Complete | 2026-03-28 |
 | 3 | Google Sheets Integration | 1 | Not started | - |
-| 4 | Multiplayer + In-Game Config | 1 | Not started | - |
+| 4 | Multiplayer + In-Game Config | 1 | Planning | - |
 | 5 | PDF Export + Polish | 1 | Not started | - |
 | 6 | CI/CD Pipeline | 1 | Not started | - |
 | 7 | Prometheus Exporter | 1 | Not started | - |

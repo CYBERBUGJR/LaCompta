@@ -9,6 +9,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Web;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace LaCompta.Web
 {
@@ -62,9 +64,21 @@ namespace LaCompta.Web
                     case "/api/fish":
                         ServeAllFish(queryParams, response);
                         break;
+                    case "/api/players":
+                        ServePlayers(response);
+                        break;
+                    case "/api/transactions":
+                        ServeTransactions(queryParams, response);
+                        break;
                     default:
+                        // Sprite endpoint: /api/sprite/{itemId}
+                        if (path.StartsWith("/api/sprite/"))
+                        {
+                            var itemId = path.Substring("/api/sprite/".Length);
+                            ServeItemSprite(itemId, response);
+                        }
                         // Try serving as static asset from Assets folder
-                        if (!ServeStaticAsset(path, response))
+                        else if (!ServeStaticAsset(path, response))
                             ServeNotFound(response);
                         break;
                 }
@@ -117,11 +131,32 @@ namespace LaCompta.Web
             {
                 FarmName = Context.IsWorldReady ? Game1.player.farmName.Value : "Unknown Farm",
                 PlayerName = Context.IsWorldReady ? Game1.player.Name : "Unknown",
+                PlayerId = Context.IsWorldReady ? Game1.player.UniqueMultiplayerID.ToString() : "",
                 Season = Context.IsWorldReady ? Game1.currentSeason : "",
                 Year = Context.IsWorldReady ? Game1.year : 0,
-                Day = Context.IsWorldReady ? Game1.dayOfMonth : 0
+                Day = Context.IsWorldReady ? Game1.dayOfMonth : 0,
+                IsMultiplayer = Context.IsMultiplayer
             };
             ServeJson(response, info);
+        }
+
+        private void ServePlayers(HttpListenerResponse response)
+        {
+            var players = new List<object>();
+            if (Context.IsWorldReady)
+            {
+                // Only list players who are currently online (not all historical farmers)
+                foreach (var farmer in Game1.getOnlineFarmers())
+                {
+                    players.Add(new
+                    {
+                        PlayerId = farmer.UniqueMultiplayerID.ToString(),
+                        Name = farmer.Name,
+                        IsCurrentPlayer = farmer.UniqueMultiplayerID == Game1.player.UniqueMultiplayerID
+                    });
+                }
+            }
+            ServeJson(response, players);
         }
 
         private void ServeAllFish(Dictionary<string, string> query, HttpListenerResponse response)
@@ -129,6 +164,99 @@ namespace LaCompta.Web
             var playerId = query.GetValueOrDefault("playerId", "");
             var fish = _repo.GetAllFish(playerId);
             ServeJson(response, fish);
+        }
+
+        private void ServeTransactions(Dictionary<string, string> query, HttpListenerResponse response)
+        {
+            var season = query.GetValueOrDefault("season", "");
+            var year = int.TryParse(query.GetValueOrDefault("year", "0"), out var y) ? y : 0;
+            var day = int.TryParse(query.GetValueOrDefault("day", "0"), out var d) ? d : 0;
+            var category = query.GetValueOrDefault("category", "");
+            var playerId = query.GetValueOrDefault("playerId", "");
+
+            var transactions = _repo.GetAllTransactions(season, year, day, category, playerId);
+            ServeJson(response, transactions);
+        }
+
+        // Sprite cache to avoid re-extracting on every request
+        private static readonly Dictionary<string, byte[]> _spriteCache = new();
+
+        private void ServeItemSprite(string itemId, HttpListenerResponse response)
+        {
+            try
+            {
+                // Return cached if available
+                if (_spriteCache.TryGetValue(itemId, out var cached))
+                {
+                    response.StatusCode = 200;
+                    response.ContentType = "image/png";
+                    response.ContentLength64 = cached.Length;
+                    response.OutputStream.Write(cached, 0, cached.Length);
+                    response.Close();
+                    return;
+                }
+
+                if (!Context.IsWorldReady || Game1.objectSpriteSheet == null)
+                {
+                    ServeNotFound(response);
+                    return;
+                }
+
+                // Parse item ID (strip "(O)" prefix if present)
+                var numericId = itemId.Replace("(O)", "");
+                if (!int.TryParse(numericId, out var id))
+                {
+                    ServeNotFound(response);
+                    return;
+                }
+
+                // Object spritesheet: 24 items per row, 16x16 each
+                var spriteSheet = Game1.objectSpriteSheet;
+                int spriteSize = 16;
+                int columns = spriteSheet.Width / spriteSize;
+                int x = (id % columns) * spriteSize;
+                int y = (id / columns) * spriteSize;
+
+                // Extract pixel data from the spritesheet
+                var pixelData = new Color[spriteSize * spriteSize];
+                spriteSheet.GetData(0, new Rectangle(x, y, spriteSize, spriteSize), pixelData, 0, pixelData.Length);
+
+                // Scale up 2x for better visibility (32x32)
+                int scale = 2;
+                int outSize = spriteSize * scale;
+                var scaled = new Color[outSize * outSize];
+                for (int py = 0; py < spriteSize; py++)
+                {
+                    for (int px = 0; px < spriteSize; px++)
+                    {
+                        var c = pixelData[py * spriteSize + px];
+                        for (int sy = 0; sy < scale; sy++)
+                            for (int sx = 0; sx < scale; sx++)
+                                scaled[(py * scale + sy) * outSize + (px * scale + sx)] = c;
+                    }
+                }
+
+                // Create a new texture and save as PNG
+                using var texture = new Texture2D(Game1.graphics.GraphicsDevice, outSize, outSize);
+                texture.SetData(scaled);
+                using var ms = new System.IO.MemoryStream();
+                texture.SaveAsPng(ms, outSize, outSize);
+                var pngBytes = ms.ToArray();
+
+                // Cache it
+                _spriteCache[itemId] = pngBytes;
+
+                response.StatusCode = 200;
+                response.ContentType = "image/png";
+                response.ContentLength64 = pngBytes.Length;
+                response.OutputStream.Write(pngBytes, 0, pngBytes.Length);
+                response.Close();
+            }
+            catch (System.Exception ex)
+            {
+                _monitor.Log($"Sprite error for {itemId}: {ex.Message}", LogLevel.Debug);
+                ServeNotFound(response);
+            }
         }
 
         private void ServeOverallSummary(Dictionary<string, string> query, HttpListenerResponse response)

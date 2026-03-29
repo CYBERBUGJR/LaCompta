@@ -37,6 +37,20 @@ Type these in the SMAPI console while the game is running:
 | `lacompta_status` | Show DB stats (seasons tracked, legendary fish, per-season breakdown) |
 | `lacompta_open` | Open the web dashboard in your default browser |
 
+### In-Game Configuration (GMCM)
+
+If [Generic Mod Config Menu](https://www.nexusmods.com/stardewvalley/mods/5098) is installed, LaCompta settings are available in the mod config menu:
+- **Auto-open dashboard on save load** — toggle
+- **Web server port** — configurable (default 5555, requires restart)
+
+Without GMCM, edit `config.json` in the mod folder manually.
+
+### Multiplayer Support
+
+- **Network multiplayer**: each machine runs its own mod and database — no conflicts
+- **Split-screen**: per-player data is isolated via `PerScreen<T>` wrappers
+- Dashboard shows a player selector when multiple players have tracked data
+
 ### Frontend Development
 
 **Standalone dev server (recommended):**
