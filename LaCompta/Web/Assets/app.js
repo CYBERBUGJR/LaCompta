@@ -185,9 +185,9 @@ function makeStockCard(label, change, pct, positiveIsGood) {
   // Main row: arrow + value + (pct)
   var row = createEl('div', { className: 'stock-row' });
 
-  // Arrow
+  // Arrow: direction matches actual change (up/down), color matches good/bad
   var arrow = createEl('div', { className: 'stock-arrow ' + colorClass });
-  arrow.textContent = isGood ? '\u25B2' : '\u25BC';
+  arrow.textContent = isPositive ? '\u25B2' : '\u25BC';
   row.appendChild(arrow);
 
   // Value
@@ -687,6 +687,10 @@ function toggleFilter(catIndex) {
     activeFilters.splice(pos, 1);
   } else {
     activeFilters.push(catIndex);
+  }
+  // Reset filters if all 5 categories are selected
+  if (activeFilters.length >= 5) {
+    activeFilters = [];
   }
   applyFilters();
 }

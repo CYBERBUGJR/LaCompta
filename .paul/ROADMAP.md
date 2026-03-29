@@ -34,7 +34,7 @@ Phases: 3 of 7 complete
 | 2 | Local Web Dashboard | 2 | Complete | 2026-03-28 |
 | 3 | Google Sheets Integration | 1 | Not started | - |
 | 4 | Multiplayer + In-Game Config | 1 | Complete | 2026-03-29 |
-| 5 | PDF Export + Polish | 1 | Not started | - |
+| 5 | PDF Export + Polish | 1 | Planning | - |
 | 6 | CI/CD Pipeline | 1 | Not started | - |
 | 7 | Prometheus Exporter | 1 | Not started | - |
 
