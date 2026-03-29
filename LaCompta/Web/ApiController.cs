@@ -1,4 +1,5 @@
 using LaCompta.Data;
+using LaCompta.Services;
 using StardewModdingAPI;
 using StardewValley;
 using System;
@@ -19,6 +20,7 @@ namespace LaCompta.Web
         private readonly Repository _repo;
         private readonly IMonitor _monitor;
         private readonly string _assetsPath;
+        private ExcelExportService _excelService;
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -30,6 +32,7 @@ namespace LaCompta.Web
             _repo = repo;
             _monitor = monitor;
             _assetsPath = Path.Combine(modPath, "Assets");
+            _excelService = new ExcelExportService(repo, monitor);
         }
 
         public void HandleRequest(string path, string query, HttpListenerResponse response)
@@ -69,6 +72,9 @@ namespace LaCompta.Web
                         break;
                     case "/api/transactions":
                         ServeTransactions(queryParams, response);
+                        break;
+                    case "/api/report/xlsx":
+                        ServeReportXlsx(queryParams, response);
                         break;
                     default:
                         // Sprite endpoint: /api/sprite/{itemId}
@@ -164,6 +170,38 @@ namespace LaCompta.Web
             var playerId = query.GetValueOrDefault("playerId", "");
             var fish = _repo.GetAllFish(playerId);
             ServeJson(response, fish);
+        }
+
+        private void ServeReportXlsx(Dictionary<string, string> query, HttpListenerResponse response)
+        {
+            var playerId = query.GetValueOrDefault("playerId", "");
+            if (string.IsNullOrEmpty(playerId) && Context.IsWorldReady)
+                playerId = Game1.player.UniqueMultiplayerID.ToString();
+
+            try
+            {
+                var xlsxBytes = _excelService.GenerateXlsx(playerId);
+                if (xlsxBytes.Length == 0 && !string.IsNullOrEmpty(playerId))
+                    xlsxBytes = _excelService.GenerateXlsx("");
+                if (xlsxBytes.Length == 0)
+                {
+                    ServeJson(response, new { error = "No data to export. Play some days and ship items first!" });
+                    return;
+                }
+
+                var farmName = Context.IsWorldReady ? Game1.player.farmName.Value : "Farm";
+                response.StatusCode = 200;
+                response.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                response.AddHeader("Content-Disposition", $"attachment; filename=\"LaCompta-{farmName}-report.xlsx\"");
+                response.ContentLength64 = xlsxBytes.Length;
+                response.OutputStream.Write(xlsxBytes, 0, xlsxBytes.Length);
+                response.Close();
+            }
+            catch (Exception ex)
+            {
+                _monitor.Log($"XLSX export error: {ex.Message}", LogLevel.Error);
+                ServeError(response, "Excel export failed: " + ex.Message);
+            }
         }
 
         private void ServeTransactions(Dictionary<string, string> query, HttpListenerResponse response)

@@ -36,6 +36,7 @@ Type these in the SMAPI console while the game is running:
 | `lacompta_test` | Run 6 integration tests (farming, fishing, mining, legendary fish, expenses, classifier) |
 | `lacompta_status` | Show DB stats (seasons tracked, legendary fish, per-season breakdown) |
 | `lacompta_open` | Open the web dashboard in your default browser |
+| `lacompta_export` | Export an Excel (.xlsx) report to the mod data folder |
 
 ### In-Game Configuration (GMCM)
 

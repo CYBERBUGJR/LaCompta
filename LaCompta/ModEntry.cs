@@ -21,6 +21,7 @@ namespace LaCompta
         private readonly PerScreen<TrackingService> _tracker = new();
         private readonly PerScreen<SeasonSummaryService> _seasonSummary = new();
         private WebServer _webServer = null!;
+        private ExcelExportService _excelService;
 
         public override void Entry(IModHelper helper)
         {
@@ -38,6 +39,7 @@ namespace LaCompta
             helper.ConsoleCommands.Add("lacompta_test", "Run LaCompta integration tests", this.RunTests);
             helper.ConsoleCommands.Add("lacompta_status", "Show current DB stats", this.ShowStatus);
             helper.ConsoleCommands.Add("lacompta_open", "Open LaCompta dashboard in browser", this.OpenDashboard);
+            helper.ConsoleCommands.Add("lacompta_export", "Export Excel report to mod data folder", this.ExportXlsx);
         }
 
         private void OnGameLaunched(object sender, GameLaunchedEventArgs e)
@@ -96,6 +98,8 @@ namespace LaCompta
             _tracker.Value = new TrackingService(_repo, this.Monitor);
             _seasonSummary.Value = new SeasonSummaryService(_repo, this.Monitor);
 
+            _excelService = new ExcelExportService(_repo, this.Monitor);
+
             // Stop existing web server if reloading a save without returning to title
             _webServer?.Stop();
 
@@ -148,6 +152,32 @@ namespace LaCompta
 
             _tracker.Value.OnDayEnding();
             _seasonSummary.Value?.OnDayEnding();
+        }
+
+        private void ExportXlsx(string command, string[] args)
+        {
+            if (_excelService == null)
+            {
+                this.Monitor.Log("LaCompta not initialized. Load a save first!", LogLevel.Warn);
+                return;
+            }
+
+            var playerId = Context.IsWorldReady ? Game1.player.UniqueMultiplayerID.ToString() : "";
+            var farmName = Context.IsWorldReady ? Game1.player.farmName.Value : "Farm";
+            var outputPath = System.IO.Path.Combine(this.Helper.DirectoryPath, $"LaCompta-{farmName}-report.xlsx");
+
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    _excelService.GenerateXlsxToFile(playerId, outputPath);
+                    this.Monitor.Log($"Excel report saved to: {outputPath}", LogLevel.Info);
+                }
+                catch (System.Exception ex)
+                {
+                    this.Monitor.Log($"Excel export failed: {ex.Message}", LogLevel.Error);
+                }
+            });
         }
 
         /// <summary>
