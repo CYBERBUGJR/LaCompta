@@ -18,12 +18,16 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Setup SMAPI build environment
+      - name: Build game stubs
         run: |
-          mkdir -p "/tmp/stardew/Stardew Valley/smapi-internal"
-          wget -q "https://github.com/Pathoschild/SMAPI/releases/download/4.5.2/SMAPI-4.5.2-installer.zip" -O /tmp/smapi.zip
-          unzip -q /tmp/smapi.zip -d /tmp/smapi-extract
-          find /tmp/smapi-extract -name "*.dll" -exec cp {} "/tmp/stardew/Stardew Valley/smapi-internal/" \; 2>/dev/null || true
+          GAME="/tmp/stardew/Stardew Valley"
+          mkdir -p "$GAME/smapi-internal"
+          touch "$GAME/Stardew Valley"
+
+          dotnet build .github/stubs/Stubs.csproj -o /tmp/stubout -v q
+          cp /tmp/stubout/Stubs.dll "$GAME/StardewModdingAPI.dll"
+          cp /tmp/stubout/Stubs.dll "$GAME/Stardew Valley.dll"
+          cp /tmp/stubout/Stubs.dll "$GAME/smapi-internal/StardewModdingAPI.dll"
 
       - name: Restore
         run: dotnet restore LaCompta/LaCompta.csproj
@@ -31,7 +35,7 @@ jobs:
           GamePath: /tmp/stardew/Stardew Valley
 
       - name: Build Release
-        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore
+        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore /p:EnableModDeploy=false /p:EnableModZip=false
         env:
           GamePath: /tmp/stardew/Stardew Valley
 
@@ -49,13 +53,12 @@ jobs:
           for dll in LaCompta/bin/Release/net6.0/*.dll; do
             name=$(basename "$dll")
             case "$name" in
-              LaCompta.dll|StardewValley*|SMAPI*|MonoGame*|xna*) continue ;;
+              LaCompta.dll|Stubs.dll|StardewValley*|SMAPI*|MonoGame*|xna*) continue ;;
               *) cp "$dll" "$MOD_DIR/" ;;
             esac
           done
 
           cp -r LaCompta/bin/Release/net6.0/Web/Assets/* "$MOD_DIR/Assets/" 2>/dev/null || true
-          cp LaCompta/bin/Release/net6.0/libe_sqlite3.so "$MOD_DIR/" 2>/dev/null || true
 
           cd release
           zip -r "../LaCompta-${VERSION}.zip" LaCompta/
