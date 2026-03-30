@@ -24,10 +24,16 @@ jobs:
           mkdir -p "$GAME/smapi-internal"
           touch "$GAME/Stardew Valley"
 
-          dotnet build .github/stubs/Stubs.csproj -o /tmp/stubout -v q
-          cp /tmp/stubout/Stubs.dll "$GAME/StardewModdingAPI.dll"
-          cp /tmp/stubout/Stubs.dll "$GAME/Stardew Valley.dll"
-          cp /tmp/stubout/Stubs.dll "$GAME/smapi-internal/StardewModdingAPI.dll"
+          dotnet build .github/stubs/Xna/Xna.csproj -o /tmp/stubout -v q
+          dotnet build .github/stubs/GameData/GameData.csproj -o /tmp/stubout -v q
+          dotnet build .github/stubs/Game/Game.csproj -o /tmp/stubout -v q
+          dotnet build .github/stubs/Smapi/Smapi.csproj -o /tmp/stubout -v q
+
+          cp /tmp/stubout/StardewModdingAPI.dll "$GAME/StardewModdingAPI.dll"
+          cp /tmp/stubout/StardewModdingAPI.dll "$GAME/smapi-internal/StardewModdingAPI.dll"
+          cp "/tmp/stubout/Stardew Valley.dll" "$GAME/Stardew Valley.dll"
+          cp /tmp/stubout/StardewValley.GameData.dll "$GAME/StardewValley.GameData.dll"
+          cp /tmp/stubout/MonoGame.Framework.dll "$GAME/MonoGame.Framework.dll"
 
       - name: Restore
         run: dotnet restore LaCompta/LaCompta.csproj
@@ -53,10 +59,18 @@ jobs:
           for dll in LaCompta/bin/Release/net6.0/*.dll; do
             name=$(basename "$dll")
             case "$name" in
-              LaCompta.dll|Stubs.dll|StardewValley*|SMAPI*|MonoGame*|xna*) continue ;;
+              LaCompta.dll|Stubs.dll|StardewValley*|StardewModdingAPI*|SMAPI*|MonoGame*|xna*) continue ;;
               *) cp "$dll" "$MOD_DIR/" ;;
             esac
           done
+
+          # Copy native SQLite binaries for all platforms from NuGet cache
+          SQLITE_PKG=$(find ~/.nuget/packages/sqlitepclraw.lib.e_sqlite3 -maxdepth 1 -type d | sort -V | tail -1)
+          if [ -n "$SQLITE_PKG" ]; then
+            cp "$SQLITE_PKG/runtimes/win-x64/native/e_sqlite3.dll" "$MOD_DIR/" 2>/dev/null || true
+            cp "$SQLITE_PKG/runtimes/linux-x64/native/libe_sqlite3.so" "$MOD_DIR/" 2>/dev/null || true
+            cp "$SQLITE_PKG/runtimes/osx-x64/native/libe_sqlite3.dylib" "$MOD_DIR/" 2>/dev/null || true
+          fi
 
           cp -r LaCompta/bin/Release/net6.0/Web/Assets/* "$MOD_DIR/Assets/" 2>/dev/null || true
 
