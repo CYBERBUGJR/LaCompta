@@ -23,11 +23,17 @@ jobs:
           mkdir -p "$GAME/smapi-internal"
           touch "$GAME/Stardew Valley"
 
-          # Build stub assemblies from .github/stubs/
-          dotnet build .github/stubs/Stubs.csproj -o /tmp/stubout -v q
-          cp /tmp/stubout/Stubs.dll "$GAME/StardewModdingAPI.dll"
-          cp /tmp/stubout/Stubs.dll "$GAME/Stardew Valley.dll"
-          cp /tmp/stubout/Stubs.dll "$GAME/smapi-internal/StardewModdingAPI.dll"
+          # Build stub assemblies with correct assembly names
+          dotnet build .github/stubs/Xna/Xna.csproj -o /tmp/stubout -v q
+          dotnet build .github/stubs/GameData/GameData.csproj -o /tmp/stubout -v q
+          dotnet build .github/stubs/Game/Game.csproj -o /tmp/stubout -v q
+          dotnet build .github/stubs/Smapi/Smapi.csproj -o /tmp/stubout -v q
+
+          cp /tmp/stubout/StardewModdingAPI.dll "$GAME/StardewModdingAPI.dll"
+          cp /tmp/stubout/StardewModdingAPI.dll "$GAME/smapi-internal/StardewModdingAPI.dll"
+          cp "/tmp/stubout/Stardew Valley.dll" "$GAME/Stardew Valley.dll"
+          cp /tmp/stubout/StardewValley.GameData.dll "$GAME/StardewValley.GameData.dll"
+          cp /tmp/stubout/MonoGame.Framework.dll "$GAME/MonoGame.Framework.dll"
 
       - name: Restore
         run: dotnet restore LaCompta/LaCompta.csproj
