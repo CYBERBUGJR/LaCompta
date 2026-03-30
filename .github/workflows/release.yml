@@ -59,7 +59,7 @@ jobs:
           for dll in LaCompta/bin/Release/net6.0/*.dll; do
             name=$(basename "$dll")
             case "$name" in
-              LaCompta.dll|Stubs.dll|StardewValley*|SMAPI*|MonoGame*|xna*) continue ;;
+              LaCompta.dll|Stubs.dll|StardewValley*|StardewModdingAPI*|SMAPI*|MonoGame*|xna*) continue ;;
               *) cp "$dll" "$MOD_DIR/" ;;
             esac
           done

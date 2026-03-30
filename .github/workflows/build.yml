@@ -11,11 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET 6
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
 
       - name: Build game stubs
         run: |
@@ -40,7 +45,31 @@ jobs:
         env:
           GamePath: /tmp/stardew/Stardew Valley
 
+      - name: Begin SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ARGS="/k:CYBERBUGJR_LaCompta /o:cyberbugjr /d:sonar.token=$SONAR_TOKEN /d:sonar.host.url=https://sonarcloud.io /d:sonar.cs.opencover.reportsPaths=**/coverage.opencover.xml"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ARGS="$ARGS /d:sonar.pullrequest.key=${{ github.event.pull_request.number }} /d:sonar.pullrequest.branch=${{ github.head_ref }} /d:sonar.pullrequest.base=${{ github.base_ref }}"
+          else
+            ARGS="$ARGS /d:sonar.branch.name=${{ github.ref_name }}"
+          fi
+          dotnet sonarscanner begin $ARGS
+
       - name: Build
         run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore /p:EnableModDeploy=false /p:EnableModZip=false
         env:
           GamePath: /tmp/stardew/Stardew Valley
+
+      - name: End SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token=$SONAR_TOKEN
+
+      - name: Check Quality Gate
+        uses: sonarsource/sonarqube-quality-gate-action@v1
+        with:
+          scanMetadataReportFile: .sonarqube/out/.sonar/report-task.txt
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
