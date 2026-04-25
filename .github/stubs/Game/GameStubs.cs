@@ -1,3 +1,11 @@
+// Stub assembly used ONLY for CI compilation. Not redistributed.
+// Type namespaces MUST match real Stardew Valley 1.6 — otherwise mod IL
+// references types that don't exist at runtime and SMAPI rejects the mod.
+//
+// Releases are built LOCALLY against the real game DLLs, not against these
+// stubs (see docs/RELEASING.md). These stubs only need to be accurate enough
+// that the project compiles in CI for sanity checks.
+
 using System;
 using System.Collections.Generic;
 
@@ -9,10 +17,10 @@ namespace StardewValley
         public static string currentSeason = "";
         public static int year = 0;
         public static int dayOfMonth = 0;
-        public static GraphicsDeviceManager graphics;
+        public static Microsoft.Xna.Framework.GraphicsDeviceManager graphics;
         public static Farm getFarm() => null;
         public static IEnumerable<Farmer> getOnlineFarmers() => Array.Empty<Farmer>();
-        public static IDictionary<string, ObjectData> objectData => new Dictionary<string, ObjectData>();
+        public static IDictionary<string, GameData.Objects.ObjectData> objectData => new Dictionary<string, GameData.Objects.ObjectData>();
         public static IDictionary<string, GameData.Crops.CropData> cropData => new Dictionary<string, GameData.Crops.CropData>();
         public static Microsoft.Xna.Framework.Graphics.Texture2D objectSpriteSheet;
     }
@@ -23,7 +31,7 @@ namespace StardewValley
         public NetString farmName = new();
         public int Money;
     }
-    public class NetString { public string Value = ""; }
+    public class NetString { public string Value { get; set; } = ""; }
     public class Farm
     {
         public IList<Item> getShippingBin(Farmer f) => new List<Item>();
@@ -50,12 +58,15 @@ namespace StardewValley
         public static int flowersCategory = -80;
         public static int FishCategory = -4;
     }
-    public class ObjectData { public int Price; }
     public class ItemRegistry { public static Item Create(string id, int qty = 1) => new Item(); }
-    public class GraphicsDeviceManager { public Microsoft.Xna.Framework.Graphics.GraphicsDevice GraphicsDevice; }
-    public class NetFieldBase<T, TSelf> { public T Value; }
+    public class NetFieldBase<T, TSelf> { public T Value { get; set; } }
     namespace TerrainFeatures
     {
         public class HoeDirt { public NetFieldBase<string, object> fertilizer = new(); public object crop; }
     }
+}
+
+namespace StardewValley.GameData.Objects
+{
+    public class ObjectData { public int Price; }
 }

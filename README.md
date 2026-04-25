@@ -81,6 +81,16 @@ dotnet build
 
 The mod auto-deploys to your `Stardew Valley/Mods/LaCompta/` folder via SMAPI's ModBuildConfig.
 
+### Producing a release zip
+
+Releases are built **locally** against the real game DLLs, not by CI. Run:
+
+```bash
+dotnet build LaCompta/LaCompta.csproj --configuration Release
+```
+
+ModBuildConfig produces `LaCompta/bin/Release/LaCompta <version>.zip` ready to upload to GitHub Releases. See [docs/RELEASING.md](docs/RELEASING.md) for the full release procedure.
+
 ### Frontend development (no game needed)
 
 ```bash
@@ -103,6 +113,7 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for full dev setup and PR guide
 
 - [Architecture](docs/ARCHITECTURE.md) How the mod works
 - [Contributing](docs/CONTRIBUTING.md) Dev setup and PR guidelines
+- [Releasing](docs/RELEASING.md) How to cut and publish a release
 - [Troubleshooting](docs/TROUBLESHOOTING.md) Common issues and fixes
 - [Modding Notes](docs/MODDING-NOTES.md) SMAPI tricks and game data quirks
 

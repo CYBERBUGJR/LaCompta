@@ -1,9 +1,16 @@
+// Stub assembly used ONLY for CI compilation. Not redistributed.
+// Compiled as MonoGame.Framework.dll to match the real game reference.
+
 namespace Microsoft.Xna.Framework
 {
     public struct Rectangle { public Rectangle(int x, int y, int w, int h) { } }
     public struct Color
     {
         public static Color FromNonPremultiplied(int r, int g, int b, int a) => new();
+    }
+    public class GraphicsDeviceManager
+    {
+        public Graphics.GraphicsDevice GraphicsDevice => null;
     }
     namespace Graphics
     {

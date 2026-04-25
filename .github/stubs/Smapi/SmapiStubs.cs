@@ -1,3 +1,9 @@
+// Stub assembly used ONLY for CI compilation. Not redistributed.
+// Namespaces and member kinds (field vs property) MUST match the real SMAPI
+// surface area used by LaCompta — otherwise the mod IL references types that
+// don't exist in real StardewModdingAPI.dll and SMAPI flags it as
+// "no longer compatible".
+
 using System;
 
 namespace StardewModdingAPI
@@ -5,7 +11,7 @@ namespace StardewModdingAPI
     public interface IModHelper
     {
         string DirectoryPath { get; }
-        IModEvents Events { get; }
+        Events.IModEvents Events { get; }
         ICommandHelper ConsoleCommands { get; }
         IModRegistry ModRegistry { get; }
         T ReadConfig<T>() where T : new();
@@ -13,16 +19,6 @@ namespace StardewModdingAPI
     }
     public interface IMonitor { void Log(string msg, LogLevel level); }
     public interface IManifest { }
-    public interface IModEvents { IGameLoopEvents GameLoop { get; } IMultiplayerEvents Multiplayer { get; } }
-    public interface IGameLoopEvents
-    {
-        event EventHandler<Events.GameLaunchedEventArgs> GameLaunched;
-        event EventHandler<Events.SaveLoadedEventArgs> SaveLoaded;
-        event EventHandler<Events.DayStartedEventArgs> DayStarted;
-        event EventHandler<Events.DayEndingEventArgs> DayEnding;
-        event EventHandler<Events.ReturnedToTitleEventArgs> ReturnedToTitle;
-    }
-    public interface IMultiplayerEvents { }
     public interface ICommandHelper { void Add(string name, string doc, Action<string, string[]> callback); }
     public interface IModRegistry { T GetApi<T>(string modId) where T : class; }
     public enum LogLevel { Trace, Debug, Info, Warn, Error, Alert }
@@ -39,16 +35,32 @@ namespace StardewModdingAPI
         public static bool IsMainPlayer => false;
         public static bool IsMultiplayer => false;
     }
-    namespace Events
+}
+
+namespace StardewModdingAPI.Events
+{
+    public interface IModEvents
     {
-        public class GameLaunchedEventArgs : EventArgs { }
-        public class SaveLoadedEventArgs : EventArgs { }
-        public class DayStartedEventArgs : EventArgs { }
-        public class DayEndingEventArgs : EventArgs { }
-        public class ReturnedToTitleEventArgs : EventArgs { }
+        IGameLoopEvents GameLoop { get; }
+        IMultiplayerEvents Multiplayer { get; }
     }
-    namespace Utilities
+    public interface IGameLoopEvents
     {
-        public class PerScreen<T> { public T Value { get; set; } }
+        event EventHandler<GameLaunchedEventArgs> GameLaunched;
+        event EventHandler<SaveLoadedEventArgs> SaveLoaded;
+        event EventHandler<DayStartedEventArgs> DayStarted;
+        event EventHandler<DayEndingEventArgs> DayEnding;
+        event EventHandler<ReturnedToTitleEventArgs> ReturnedToTitle;
     }
+    public interface IMultiplayerEvents { }
+    public class GameLaunchedEventArgs : EventArgs { }
+    public class SaveLoadedEventArgs : EventArgs { }
+    public class DayStartedEventArgs : EventArgs { }
+    public class DayEndingEventArgs : EventArgs { }
+    public class ReturnedToTitleEventArgs : EventArgs { }
+}
+
+namespace StardewModdingAPI.Utilities
+{
+    public class PerScreen<T> { public T Value { get; set; } }
 }

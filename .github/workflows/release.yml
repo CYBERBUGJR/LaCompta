@@ -1,5 +1,16 @@
 name: Release
 
+# Release artifacts (the .zip) are built LOCALLY by the maintainer against the
+# real Stardew Valley DLLs, not by CI. CI stubs are minimal and produce IL
+# that references types/namespaces missing from real game/SMAPI assemblies,
+# which causes SMAPI to reject the mod with "no longer compatible".
+#
+# This workflow only creates the GitHub Release shell (page + auto-generated
+# notes) when a v* tag is pushed. The maintainer attaches the locally-built
+# zip via `gh release upload` or the GitHub web UI.
+#
+# See docs/RELEASING.md for the full release procedure.
+
 on:
   push:
     tags: ['v*']
@@ -8,63 +19,18 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  release-shell:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 6
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '6.0.x'
-
-      - name: Build game stubs
-        run: |
-          GAME="/tmp/stardew/Stardew Valley"
-          mkdir -p "$GAME/smapi-internal"
-          touch "$GAME/Stardew Valley"
-
-          dotnet build .github/stubs/Xna/Xna.csproj -o /tmp/stubout -v q
-          dotnet build .github/stubs/GameData/GameData.csproj -o /tmp/stubout -v q
-          dotnet build .github/stubs/Game/Game.csproj -o /tmp/stubout -v q
-          dotnet build .github/stubs/Smapi/Smapi.csproj -o /tmp/stubout -v q
-
-          cp /tmp/stubout/StardewModdingAPI.dll "$GAME/StardewModdingAPI.dll"
-          cp /tmp/stubout/StardewModdingAPI.dll "$GAME/smapi-internal/StardewModdingAPI.dll"
-          cp "/tmp/stubout/Stardew Valley.dll" "$GAME/Stardew Valley.dll"
-          cp /tmp/stubout/StardewValley.GameData.dll "$GAME/StardewValley.GameData.dll"
-          cp /tmp/stubout/MonoGame.Framework.dll "$GAME/MonoGame.Framework.dll"
-
-      - name: Restore
-        run: dotnet restore LaCompta/LaCompta.csproj
-        env:
-          GamePath: /tmp/stardew/Stardew Valley
-
-      - name: Prepare deploy folder
-        run: mkdir -p "/tmp/stardew/Stardew Valley/Mods"
-
-      - name: Build & package (ModBuildConfig produces the zip)
-        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore
-        env:
-          GamePath: /tmp/stardew/Stardew Valley
-
-      - name: Locate and rename release zip
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          VERSION="${REF_NAME#v}"
-          ZIP=$(find LaCompta/bin/Release -maxdepth 4 -name '*.zip' | head -n1)
-          if [ -z "$ZIP" ]; then
-            echo "::error::ModBuildConfig did not produce a zip" >&2
-            find LaCompta/bin -type f | head -200 >&2
-            exit 1
-          fi
-          cp "$ZIP" "LaCompta-${VERSION}.zip"
-          echo "Packaged: $ZIP -> LaCompta-${VERSION}.zip"
-          unzip -l "LaCompta-${VERSION}.zip"
-
-      - name: Create GitHub Release
+      - name: Create GitHub Release shell (notes only — assets uploaded by maintainer)
         uses: softprops/action-gh-release@v2
         with:
-          files: LaCompta-*.zip
           generate_release_notes: true
+          draft: false
+          body: |
+            > **Release artifact pending.** The maintainer will attach `LaCompta-${{ github.ref_name }}.zip` shortly.
+            >
+            > The mod zip is built locally against the real Stardew Valley DLLs
+            > (see `docs/RELEASING.md`) — CI does not produce release artifacts.
