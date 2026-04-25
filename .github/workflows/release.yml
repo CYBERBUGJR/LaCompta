@@ -40,42 +40,28 @@ jobs:
         env:
           GamePath: /tmp/stardew/Stardew Valley
 
-      - name: Build Release
-        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore /p:EnableModDeploy=false /p:EnableModZip=false
+      - name: Prepare deploy folder
+        run: mkdir -p "/tmp/stardew/Stardew Valley/Mods"
+
+      - name: Build & package (ModBuildConfig produces the zip)
+        run: dotnet build LaCompta/LaCompta.csproj --configuration Release --no-restore
         env:
           GamePath: /tmp/stardew/Stardew Valley
 
-      - name: Package mod
+      - name: Locate and rename release zip
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
           VERSION="${REF_NAME#v}"
-          MOD_DIR="release/LaCompta"
-          mkdir -p "$MOD_DIR/Assets"
-
-          cp LaCompta/bin/Release/net6.0/LaCompta.dll "$MOD_DIR/"
-          cp LaCompta/manifest.json "$MOD_DIR/"
-
-          for dll in LaCompta/bin/Release/net6.0/*.dll; do
-            name=$(basename "$dll")
-            case "$name" in
-              LaCompta.dll|Stubs.dll|StardewValley*|StardewModdingAPI*|SMAPI*|MonoGame*|xna*) continue ;;
-              *) cp "$dll" "$MOD_DIR/" ;;
-            esac
-          done
-
-          # Copy native SQLite binaries for all platforms from NuGet cache
-          SQLITE_PKG=$(find ~/.nuget/packages/sqlitepclraw.lib.e_sqlite3 -maxdepth 1 -type d | sort -V | tail -1)
-          if [ -n "$SQLITE_PKG" ]; then
-            cp "$SQLITE_PKG/runtimes/win-x64/native/e_sqlite3.dll" "$MOD_DIR/" 2>/dev/null || true
-            cp "$SQLITE_PKG/runtimes/linux-x64/native/libe_sqlite3.so" "$MOD_DIR/" 2>/dev/null || true
-            cp "$SQLITE_PKG/runtimes/osx-x64/native/libe_sqlite3.dylib" "$MOD_DIR/" 2>/dev/null || true
+          ZIP=$(find LaCompta/bin/Release -maxdepth 4 -name '*.zip' | head -n1)
+          if [ -z "$ZIP" ]; then
+            echo "::error::ModBuildConfig did not produce a zip" >&2
+            find LaCompta/bin -type f | head -200 >&2
+            exit 1
           fi
-
-          cp -r LaCompta/bin/Release/net6.0/Web/Assets/* "$MOD_DIR/Assets/" 2>/dev/null || true
-
-          cd release
-          zip -r "../LaCompta-${VERSION}.zip" LaCompta/
+          cp "$ZIP" "LaCompta-${VERSION}.zip"
+          echo "Packaged: $ZIP -> LaCompta-${VERSION}.zip"
+          unzip -l "LaCompta-${VERSION}.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

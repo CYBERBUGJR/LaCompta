@@ -9,35 +9,19 @@
   <ItemGroup>
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.*" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.*" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.6" GeneratePathProperty="true" />
     <PackageReference Include="ClosedXML" Version="0.102.*" />
   </ItemGroup>
 
-  <!-- Include web dashboard assets in build output -->
   <ItemGroup>
     <Content Include="Web\Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- Copy native e_sqlite3 lib to both output AND mod deploy folder.
-       ModBuildConfig only copies .dll files, not .so/.dylib, so we handle it manually.
-       We copy the native lib for the current OS to the build output, and all platforms to the mod folder. -->
-  <Target Name="CopyNativeSqlite" AfterTargets="Build">
-    <PropertyGroup>
-      <SqlitePkgDir>$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3/2.1.6</SqlitePkgDir>
-      <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(SqlitePkgDir)/runtimes/linux-x64/native/libe_sqlite3.so</NativeSqliteSrc>
-      <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(SqlitePkgDir)/runtimes/osx-x64/native/libe_sqlite3.dylib</NativeSqliteSrc>
-      <NativeSqliteSrc Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(SqlitePkgDir)/runtimes/win-x64/native/e_sqlite3.dll</NativeSqliteSrc>
-      <GameModsDir>$(GamePath)/Mods/LaCompta</GameModsDir>
-    </PropertyGroup>
-    <!-- Copy current-OS native lib to build output -->
-    <Copy SourceFiles="$(NativeSqliteSrc)" DestinationFolder="$(TargetDir)" Condition="Exists('$(NativeSqliteSrc)')" />
-    <!-- Copy ALL platform native libs to mod deploy folder -->
-    <Copy SourceFiles="$(SqlitePkgDir)/runtimes/win-x64/native/e_sqlite3.dll" DestinationFolder="$(GameModsDir)" Condition="Exists('$(GameModsDir)') And Exists('$(SqlitePkgDir)/runtimes/win-x64/native/e_sqlite3.dll')" />
-    <Copy SourceFiles="$(SqlitePkgDir)/runtimes/linux-x64/native/libe_sqlite3.so" DestinationFolder="$(GameModsDir)" Condition="Exists('$(GameModsDir)') And Exists('$(SqlitePkgDir)/runtimes/linux-x64/native/libe_sqlite3.so')" />
-    <Copy SourceFiles="$(SqlitePkgDir)/runtimes/osx-x64/native/libe_sqlite3.dylib" DestinationFolder="$(GameModsDir)" Condition="Exists('$(GameModsDir)') And Exists('$(SqlitePkgDir)/runtimes/osx-x64/native/libe_sqlite3.dylib')" />
-    <!-- Copy Assets folder to mod deploy directory -->
-    <ItemGroup>
-      <DashboardAssets Include="$(TargetDir)Web\Assets\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(DashboardAssets)" DestinationFolder="$(GameModsDir)\Assets\%(RecursiveDir)" Condition="Exists('$(GameModsDir)')" />
-  </Target>
+  <!-- Bundle native SQLite for Windows/Linux/macOS so the mod zip is self-contained on every platform.
+       ModBuildConfig copies items with CopyToOutputDirectory into both the deploy folder and the release zip. -->
+  <ItemGroup Condition="'$(PkgSQLitePCLRaw_lib_e_sqlite3)' != ''">
+    <None Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\win-x64\native\e_sqlite3.dll" Link="e_sqlite3.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\linux-x64\native\libe_sqlite3.so" Link="libe_sqlite3.so" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(PkgSQLitePCLRaw_lib_e_sqlite3)\runtimes\osx-x64\native\libe_sqlite3.dylib" Link="libe_sqlite3.dylib" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
 </Project>
