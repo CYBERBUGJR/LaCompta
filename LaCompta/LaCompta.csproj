@@ -14,7 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Web\Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Flatten Web/Assets/* to Assets/* in the build output and release zip,
+         since the runtime code reads from Path.Combine(modPath, "Assets"). -->
+    <Content Include="Web\Assets\**\*" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Bundle native SQLite for Windows/Linux/macOS so the mod zip is self-contained on every platform.
