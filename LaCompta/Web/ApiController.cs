@@ -20,6 +20,7 @@ namespace LaCompta.Web
         private readonly Repository _repo;
         private readonly IMonitor _monitor;
         private readonly string _assetsPath;
+        private readonly string _version;
         private ExcelExportService _excelService;
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -27,11 +28,12 @@ namespace LaCompta.Web
             WriteIndented = true
         };
 
-        public ApiController(Repository repo, IMonitor monitor, string modPath)
+        public ApiController(Repository repo, IMonitor monitor, string modPath, string version)
         {
             _repo = repo;
             _monitor = monitor;
             _assetsPath = Path.Combine(modPath, "Assets");
+            _version = version;
             _excelService = new ExcelExportService(repo, monitor);
         }
 
@@ -328,7 +330,8 @@ namespace LaCompta.Web
             var dashboardPath = Path.Combine(_assetsPath, "dashboard.html");
             if (File.Exists(dashboardPath))
             {
-                ServeHtml(response, File.ReadAllText(dashboardPath));
+                var html = File.ReadAllText(dashboardPath).Replace("{{VERSION}}", _version);
+                ServeHtml(response, html);
             }
             else
             {

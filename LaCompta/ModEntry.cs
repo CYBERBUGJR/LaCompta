@@ -114,7 +114,7 @@ namespace LaCompta
             _webServer?.Stop();
 
             // Start web server on configured port
-            var api = new ApiController(_repo, this.Monitor, this.Helper.DirectoryPath);
+            var api = new ApiController(_repo, this.Monitor, this.Helper.DirectoryPath, this.ModManifest.Version.ToString());
             _webServer = new WebServer(api, this.Monitor, this.Config.WebServerPort);
             _webServer.Start();
 
