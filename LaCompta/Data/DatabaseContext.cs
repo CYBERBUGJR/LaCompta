@@ -1,17 +1,21 @@
 using Microsoft.Data.Sqlite;
+using System;
 using System.IO;
 
 namespace LaCompta.Data
 {
-    public class DatabaseContext
+    public class DatabaseContext : IDisposable
     {
         private const long MaxDbSizeBytes = 2L * 1024 * 1024 * 1024; // 2 GiB
         private readonly string _connectionString;
         private readonly string _dbPath;
+        private bool _disposed;
 
-        public DatabaseContext(string modDataPath)
+        /// <param name="dbFilePath">Full path to the .db file (caller is responsible for path construction).</param>
+        public DatabaseContext(string dbFilePath)
         {
-            _dbPath = Path.Combine(modDataPath, "lacompta.db");
+            _dbPath = dbFilePath;
+            Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
             _connectionString = $"Data Source={_dbPath}";
             InitializeDatabase();
             CheckAndVacuum();
@@ -22,6 +26,19 @@ namespace LaCompta.Data
             var connection = new SqliteConnection(_connectionString);
             connection.Open();
             return connection;
+        }
+
+        /// <summary>
+        /// Microsoft.Data.Sqlite pools connections by connection string; on Windows the
+        /// pooled connection holds a file handle even after Close(). ClearAllPools()
+        /// releases that handle so the file can be deleted by the cleanup service.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            SqliteConnection.ClearAllPools();
+            GC.SuppressFinalize(this);
         }
 
         private void InitializeDatabase()
@@ -99,10 +116,6 @@ namespace LaCompta.Data
             command.ExecuteNonQuery();
         }
 
-        /// <summary>
-        /// If the DB exceeds 2 GiB, prune old item_transactions (keeping daily_records
-        /// and season_summaries intact) then VACUUM to reclaim space.
-        /// </summary>
         private void CheckAndVacuum()
         {
             if (!File.Exists(_dbPath))
@@ -114,9 +127,6 @@ namespace LaCompta.Data
 
             using var conn = GetConnection();
 
-            // Delete oldest item_transactions first (they're the bulk of data).
-            // Keep the most recent 4 in-game years (16 seasons * 28 days = 448 daily records per player).
-            // Delete transactions older than that.
             var pruneCmd = conn.CreateCommand();
             pruneCmd.CommandText = @"
                 DELETE FROM item_transactions
@@ -130,7 +140,6 @@ namespace LaCompta.Data
             ";
             pruneCmd.ExecuteNonQuery();
 
-            // VACUUM to reclaim disk space
             var vacuumCmd = conn.CreateCommand();
             vacuumCmd.CommandText = "VACUUM;";
             vacuumCmd.ExecuteNonQuery();

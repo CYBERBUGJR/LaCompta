@@ -22,6 +22,7 @@ namespace LaCompta
         private readonly PerScreen<SeasonSummaryService> _seasonSummary = new();
         private WebServer _webServer = null!;
         private ExcelExportService _excelService;
+        private SaveCleanupService _saveCleanup = null!;
 
         public override void Entry(IModHelper helper)
         {
@@ -44,6 +45,10 @@ namespace LaCompta
 
         private void OnGameLaunched(object sender, GameLaunchedEventArgs e)
         {
+            _saveCleanup = new SaveCleanupService(this.Helper.DirectoryPath, this.Monitor);
+            _saveCleanup.CleanupLegacyDatabase();
+            _saveCleanup.PruneOrphanDatabases();
+
             var gmcm = this.Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (gmcm is null)
             {
@@ -89,9 +94,14 @@ namespace LaCompta
 
         private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            // Initialize database (shared across screens)
-            var dataPath = this.Helper.DirectoryPath;
-            _db = new DatabaseContext(dataPath);
+            // One DB per Stardew save. SMAPI guarantees Constants.SaveFolderName
+            // is valid by SaveLoaded. SQLite creates the file if absent.
+            var dbPath = System.IO.Path.Combine(
+                this.Helper.DirectoryPath,
+                "data",
+                $"{Constants.SaveFolderName}.db"
+            );
+            _db = new DatabaseContext(dbPath);
             _repo = new Repository(_db);
 
             // Per-screen services for split-screen multiplayer
@@ -118,6 +128,13 @@ namespace LaCompta
         private void OnReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
         {
             _webServer?.Stop();
+
+            // Release the SQLite pool so PruneOrphanDatabases can delete files.
+            _db?.Dispose();
+            _db = null!;
+            _repo = null!;
+
+            _saveCleanup?.PruneOrphanDatabases();
         }
 
         private void OpenDashboard(string command, string[] args)
