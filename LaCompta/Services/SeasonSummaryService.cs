@@ -18,15 +18,12 @@ namespace LaCompta.Services
         }
 
         /// <summary>
-        /// Generate season summary on the last day of the season (day 28).
+        /// Upsert the current season's summary every DayEnding so the dashboard sees an
+        /// in-progress snapshot. The celebratory season-end log only fires on day 28.
         /// Call this from DayEnding AFTER TrackingService has recorded today's data.
         /// </summary>
         public void OnDayEnding()
         {
-            // Only generate summary on last day of season
-            if (Game1.dayOfMonth != 28)
-                return;
-
             var season = Game1.currentSeason;
             var year = Game1.year;
             var playerId = Game1.player.UniqueMultiplayerID.ToString();
@@ -66,6 +63,9 @@ namespace LaCompta.Services
             };
 
             _repo.SaveSeasonSummary(summary);
+
+            if (Game1.dayOfMonth != 28)
+                return;
 
             var totalIncome = farmingTotal + foragingTotal + fishingTotal + miningTotal + otherTotal;
             _monitor.Log(
