@@ -1438,6 +1438,39 @@ async function reloadAllData() {
   navigate(window.location.hash);
 }
 
+/* ========== MID-HISTORY BANNER ========== */
+function showMidHistoryBanner(year, season, day) {
+  var banner = document.getElementById('mid-history-banner');
+  if (!banner) return;
+  var seasonFr = { spring: 'Printemps', summer: 'Été', fall: 'Automne', winter: 'Hiver' }[season] || season;
+  var msg = banner.querySelector('.banner-msg');
+  if (msg) {
+    msg.textContent = '⚠️ LaCompta a démarré le suivi à partir du Jour ' + day + ' ' + seasonFr + ' An ' + year + '. Les jours antérieurs ne sont pas dans les stats.';
+  }
+  banner.hidden = false;
+}
+
+function hideMidHistoryBanner() {
+  var banner = document.getElementById('mid-history-banner');
+  if (banner) banner.hidden = true;
+}
+
+function dismissMidHistoryBanner() {
+  hideMidHistoryBanner();
+  fetch('/api/state/dismiss-mid-history', { method: 'POST' }).catch(function(e) {
+    console.error('dismiss-mid-history failed:', e);
+  });
+}
+
+async function checkAndRenderMidHistoryBanner() {
+  var state = await fetchJson('/api/state');
+  if (!state) return;
+  if (!state.isWorldReady) return;
+  if (state.midHistoryDismissed) return;
+  if (state.firstRecordYear === 1 && state.firstRecordSeason === 'spring' && state.firstRecordDay === 1) return;
+  showMidHistoryBanner(state.firstRecordYear, state.firstRecordSeason, state.firstRecordDay);
+}
+
 /* ========== INIT ========== */
 async function init() {
   setupTimeRangeSelector();
@@ -1475,6 +1508,8 @@ async function init() {
 
   window.addEventListener('hashchange', function() { navigate(window.location.hash); });
   navigate(window.location.hash);
+
+  await checkAndRenderMidHistoryBanner();
 }
 
 init();
