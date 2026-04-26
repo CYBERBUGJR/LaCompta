@@ -149,7 +149,8 @@ namespace LaCompta.Web
                 Season = Context.IsWorldReady ? Game1.currentSeason : "",
                 Year = Context.IsWorldReady ? Game1.year : 0,
                 Day = Context.IsWorldReady ? Game1.dayOfMonth : 0,
-                IsMultiplayer = Context.IsMultiplayer
+                IsMultiplayer = Context.IsMultiplayer,
+                IsWorldReady = Context.IsWorldReady
             };
             ServeJson(response, info);
         }

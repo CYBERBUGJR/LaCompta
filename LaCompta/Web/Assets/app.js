@@ -1438,6 +1438,35 @@ async function reloadAllData() {
   navigate(window.location.hash);
 }
 
+/* ========== AUTO-REFRESH POLLING ========== */
+var lastSeenDay = null;
+var pollIntervalId = null;
+var POLL_INTERVAL_MS = 10000;
+
+async function refreshGameData() {
+  var data = await Promise.all([
+    fetchJson(apiUrl('/api/summary')),
+    fetchJson(apiUrl('/api/seasons'))
+  ]);
+  if (data[0]) summaryData = data[0];
+  if (data[1]) seasons = data[1];
+  var hash = window.location.hash || '#overview';
+  var page = hash.replace('#', '') || 'overview';
+  loadPageData(page);
+}
+
+function startAutoRefreshPolling() {
+  if (pollIntervalId !== null) return;
+  pollIntervalId = setInterval(async function() {
+    var info = await fetchJson('/api/farminfo');
+    if (!info || !info.isWorldReady) return;
+    var key = info.year + '/' + info.season + '/' + info.day;
+    if (key === lastSeenDay) return;
+    lastSeenDay = key;
+    await refreshGameData();
+  }, POLL_INTERVAL_MS);
+}
+
 /* ========== MID-HISTORY BANNER ========== */
 function showMidHistoryBanner(year, season, day) {
   var banner = document.getElementById('mid-history-banner');
@@ -1510,6 +1539,11 @@ async function init() {
   navigate(window.location.hash);
 
   await checkAndRenderMidHistoryBanner();
+
+  if (farmInfo && farmInfo.isWorldReady) {
+    lastSeenDay = farmInfo.year + '/' + farmInfo.season + '/' + farmInfo.day;
+  }
+  startAutoRefreshPolling();
 }
 
 init();
