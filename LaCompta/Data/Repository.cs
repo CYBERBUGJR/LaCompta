@@ -220,6 +220,60 @@ namespace LaCompta.Data
             return fish;
         }
 
+        // === Mod State (key/value) ===
+
+        public string GetModState(string key)
+        {
+            using var conn = _db.GetConnection();
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT value FROM mod_state WHERE key = $key";
+            cmd.Parameters.AddWithValue("$key", key);
+            var result = cmd.ExecuteScalar();
+            return result == null || result == System.DBNull.Value ? null : (string)result;
+        }
+
+        public void SetModState(string key, string value)
+        {
+            using var conn = _db.GetConnection();
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT OR REPLACE INTO mod_state (key, value) VALUES ($key, $value)";
+            cmd.Parameters.AddWithValue("$key", key);
+            cmd.Parameters.AddWithValue("$value", value);
+            cmd.ExecuteNonQuery();
+        }
+
+        // === First-record-day (chronologically earliest daily_records row) ===
+
+        /// <summary>
+        /// Returns the (year, season, day) of the chronologically earliest daily_records row,
+        /// or null if no records exist yet. Season ordering follows Stardew's calendar
+        /// (spring &lt; summer &lt; fall &lt; winter), not lexicographic order.
+        /// </summary>
+        public (int Year, string Season, int Day)? GetFirstRecordDay()
+        {
+            using var conn = _db.GetConnection();
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT season, year, day FROM daily_records
+                ORDER BY year ASC,
+                         CASE season
+                             WHEN 'spring' THEN 1
+                             WHEN 'summer' THEN 2
+                             WHEN 'fall' THEN 3
+                             WHEN 'winter' THEN 4
+                         END,
+                         day ASC
+                LIMIT 1";
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+                return null;
+            return (
+                reader.GetInt32(reader.GetOrdinal("year")),
+                reader.GetString(reader.GetOrdinal("season")),
+                reader.GetInt32(reader.GetOrdinal("day"))
+            );
+        }
+
         // === Mappers ===
 
         private static DailyRecord MapDailyRecord(SqliteDataReader reader)

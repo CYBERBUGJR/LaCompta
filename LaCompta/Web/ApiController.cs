@@ -78,6 +78,12 @@ namespace LaCompta.Web
                     case "/api/report/xlsx":
                         ServeReportXlsx(queryParams, response);
                         break;
+                    case "/api/state":
+                        ServeState(response);
+                        break;
+                    case "/api/state/dismiss-mid-history":
+                        ServeDismissMidHistory(response);
+                        break;
                     default:
                         // Sprite endpoint: /api/sprite/{itemId}
                         if (path.StartsWith("/api/sprite/"))
@@ -297,6 +303,50 @@ namespace LaCompta.Web
                 _monitor.Log($"Sprite error for {itemId}: {ex.Message}", LogLevel.Debug);
                 ServeNotFound(response);
             }
+        }
+
+        private void ServeState(HttpListenerResponse response)
+        {
+            var firstRecord = _repo.GetFirstRecordDay();
+            int year;
+            string season;
+            int day;
+            if (firstRecord.HasValue)
+            {
+                year = firstRecord.Value.Year;
+                season = firstRecord.Value.Season;
+                day = firstRecord.Value.Day;
+            }
+            else if (Context.IsWorldReady)
+            {
+                year = Game1.year;
+                season = Game1.currentSeason;
+                day = Game1.dayOfMonth;
+            }
+            else
+            {
+                year = 1;
+                season = "spring";
+                day = 1;
+            }
+
+            var dismissed = _repo.GetModState("banner_mid_history_dismissed") == "1";
+
+            var state = new
+            {
+                FirstRecordYear = year,
+                FirstRecordSeason = season,
+                FirstRecordDay = day,
+                MidHistoryDismissed = dismissed,
+                IsWorldReady = Context.IsWorldReady
+            };
+            ServeJson(response, state);
+        }
+
+        private void ServeDismissMidHistory(HttpListenerResponse response)
+        {
+            _repo.SetModState("banner_mid_history_dismissed", "1");
+            ServeJson(response, new { ok = true });
         }
 
         private void ServeOverallSummary(Dictionary<string, string> query, HttpListenerResponse response)

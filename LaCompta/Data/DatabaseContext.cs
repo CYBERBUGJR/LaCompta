@@ -109,6 +109,11 @@ namespace LaCompta.Data
                     UNIQUE(fish_id, season, year, day, player_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS mod_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_daily_records_season_year ON daily_records(season, year, player_id);
                 CREATE INDEX IF NOT EXISTS idx_item_transactions_daily ON item_transactions(daily_record_id);
                 CREATE INDEX IF NOT EXISTS idx_fish_records_legendary ON fish_records(is_legendary);
